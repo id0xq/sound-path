@@ -96,41 +96,51 @@ export function makeIR(ctx, o) {
 }
 
 // Пространства. Имена вдохновлены пространствами Handpan Sphere и Храмом Звука на Алтае.
+// space — ясное пространство (предзадержка сохраняет направление звука),
+// atmos — атмосферный хвост: длинный, тёмный, «дышащий», в него звуки превращаются.
 export const SPACES = {
   temple: {
-    name: 'Храм', hint: 'Зеркальный купол: тёплый хвост, звук собирается в центре',
-    ir: { duration: 7.2, preDelay: 0.03, bloom: 0.07, lpStart: 8500, lpEnd: 1300, hp: 110,
-      focus: { interval: 0.035, count: 6, g: 0.22, color: 5200 },
-      early: [{ t: 0.011, g: 0.25, pan: -0.6 }, { t: 0.017, g: 0.22, pan: 0.7 }, { t: 0.026, g: 0.18, pan: -0.2 }] },
-    mix: 0.55, chorus: 0.6,
+    name: 'Храм', hint: 'Зеркальный купол: тёплое пространство, звук собирается вокруг',
+    space: { size: 1.25, decay: 5.2, damp: 5200, lowcut: 170, mod: 0.35, diffusion: 0.72, predelay: 0.045, width: 1, shimmer: 0 },
+    atmos: { size: 2.2, decay: 18, damp: 3000, lowcut: 200, mod: 0.8, diffusion: 0.75, predelay: 0.09, width: 1.1, shimmer: 0.06 },
+    atmosMix: 0.55, tone: 8500,
   },
   fog: {
-    name: 'Туман', hint: 'Мягкая тёмная пелена, без отражений',
-    ir: { duration: 5.2, preDelay: 0.008, bloom: 0.28, lpStart: 3400, lpEnd: 650, hp: 90 },
-    mix: 0.6, chorus: 0.8,
+    name: 'Туман', hint: 'Мягкая тёмная пелена',
+    space: { size: 1.0, decay: 4.2, damp: 2600, lowcut: 150, mod: 0.5, diffusion: 0.75, predelay: 0.02, width: 1, shimmer: 0 },
+    atmos: { size: 2.0, decay: 15, damp: 2000, lowcut: 180, mod: 0.9, diffusion: 0.75, predelay: 0.06, width: 1.1, shimmer: 0 },
+    atmosMix: 0.6, tone: 5500,
   },
   cloud: {
     name: 'Облако', hint: 'Светлое воздушное пространство над головой',
-    ir: { duration: 6.0, preDelay: 0.045, bloom: 0.16, lpStart: 13000, lpEnd: 2800, hp: 160, width: 1.15 },
-    mix: 0.5, chorus: 0.7,
+    space: { size: 1.4, decay: 5, damp: 7000, lowcut: 260, mod: 0.45, diffusion: 0.7, predelay: 0.06, width: 1.15, shimmer: 0 },
+    atmos: { size: 2.4, decay: 22, damp: 4200, lowcut: 300, mod: 0.9, diffusion: 0.75, predelay: 0.1, width: 1.2, shimmer: 0.22 },
+    atmosMix: 0.55, tone: 10000,
   },
   infinity: {
-    name: 'Бесконечность', hint: 'Очень длинный хвост, звук растворяется',
-    ir: { duration: 12.5, preDelay: 0.06, bloom: 0.45, lpStart: 6800, lpEnd: 1200, hp: 120, width: 1.1 },
-    mix: 0.6, chorus: 1,
+    name: 'Бесконечность', hint: 'Звук растворяется и почти не кончается',
+    space: { size: 1.8, decay: 8.5, damp: 4200, lowcut: 200, mod: 0.6, diffusion: 0.75, predelay: 0.07, width: 1.15, shimmer: 0 },
+    atmos: { size: 2.6, decay: 40, damp: 2800, lowcut: 220, mod: 1, diffusion: 0.75, predelay: 0.12, width: 1.25, shimmer: 0.12 },
+    atmosMix: 0.7, tone: 7500,
   },
   forest: {
-    name: 'Лес', hint: 'Открытый воздух, рассеянные отражения от деревьев',
-    ir: { duration: 2.1, preDelay: 0.012, bloom: 0.012, lpStart: 7500, lpEnd: 2200, hp: 140, sparse: 0.25,
-      early: [{ t: 0.018, g: 0.16, pan: -0.8 }, { t: 0.031, g: 0.12, pan: 0.5 }, { t: 0.047, g: 0.1, pan: 0.9, color: 4000 },
-        { t: 0.069, g: 0.08, pan: -0.4, color: 3500 }, { t: 0.093, g: 0.07, pan: 0.2, color: 3000 }, { t: 0.13, g: 0.05, pan: -0.9, color: 2500 }] },
-    mix: 0.4, chorus: 0.3,
+    name: 'Лес', hint: 'Открытый воздух: близкие звуки сухие, дальние тонут в лесу',
+    space: { size: 0.75, decay: 1.7, damp: 6000, lowcut: 200, mod: 0.25, diffusion: 0.55, predelay: 0.025, width: 1.1, shimmer: 0 },
+    atmos: { size: 1.8, decay: 10, damp: 2400, lowcut: 220, mod: 0.7, diffusion: 0.72, predelay: 0.08, width: 1.1, shimmer: 0 },
+    atmosMix: 0.4, tone: 8000,
   },
   grotto: {
-    name: 'Грот', hint: 'Каменная пещера: близкие отражения и мягкое эхо',
-    ir: { duration: 3.8, preDelay: 0.022, bloom: 0.02, lpStart: 5200, lpEnd: 900, hp: 100,
-      early: [{ t: 0.09, g: 0.2, pan: -0.5, color: 3500 }, { t: 0.18, g: 0.13, pan: 0.6, color: 3000 }, { t: 0.29, g: 0.08, pan: -0.1, color: 2500 }] },
-    mix: 0.5, chorus: 0.4,
+    name: 'Грот', hint: 'Каменная пещера: плотные отражения',
+    space: { size: 1.1, decay: 3.2, damp: 3600, lowcut: 140, mod: 0.2, diffusion: 0.45, predelay: 0.03, width: 1, shimmer: 0 },
+    atmos: { size: 2.0, decay: 12, damp: 2200, lowcut: 160, mod: 0.6, diffusion: 0.7, predelay: 0.08, width: 1, shimmer: 0 },
+    atmosMix: 0.5, tone: 6000,
+  },
+  hall: {
+    name: 'Зал', hint: 'Настоящий отклик зала из Handpan Sphere',
+    hall: true,
+    space: { size: 1.2, decay: 3.5, damp: 5000, lowcut: 170, mod: 0.3, diffusion: 0.7, predelay: 0.04, width: 1, shimmer: 0 },
+    atmos: { size: 2.2, decay: 16, damp: 2800, lowcut: 200, mod: 0.8, diffusion: 0.75, predelay: 0.09, width: 1.1, shimmer: 0.05 },
+    atmosMix: 0.45, tone: 9000,
   },
 };
 

@@ -89,7 +89,7 @@ export class Rhythm {
       if (tr === 'hp') {
         const idx = parseInt(c, 10); if (isNaN(idx)) continue;
         const m = notes[Math.min(idx, notes.length - 1)];
-        end = I.handpan(E, em.input, tt, { freq: mtof(m), vel: (step % P.spb === 0 ? 0.62 : 0.48) * (0.9 + Math.random() * 0.2), bright: 0.4 });
+        end = I.handpan(E, em.input, tt, { freq: mtof(m), vel: (step % P.spb === 0 ? 0.55 : 0.42) * (0.9 + Math.random() * 0.2), bright: 0.4 });
       } else {
         const v = (VEL[c] ?? 0.6) * (0.88 + Math.random() * 0.24);
         if (tr === 'dum' || tr === 'tek') end = I.frameDrum(E, em.input, tt, { hit: tr, vel: v });

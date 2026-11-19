@@ -1,6 +1,6 @@
 // Инструменты: физически-вдохновлённый синтез без сэмплов.
 // Каждая функция планирует звук на время t в узел dest и возвращает время окончания.
-import { clamp } from './util.js';
+import { clamp, tuning } from './util.js';
 
 const rnd = (a, b) => a + Math.random() * (b - a);
 
@@ -30,6 +30,8 @@ function grains(g, times, ampFn, tau = 0.004) {
 // ---------------- Ханг ----------------
 // Тон ханга: основной тон, октава и квинта через октаву, лёгкое биение «живого» металла.
 export function handpan(E, dest, t, { freq, vel = 0.7, bright = 0.5, bowed = false }) {
+  // настоящие записи ханга из Handpan Sphere, если загружены
+  if (E.hp && E.hp.ready) return E.hp.play(dest, t, 69 + 12 * Math.log2(freq / tuning.a4), { vel, bright, bowed });
   const ctx = E.ctx;
   const low = clamp((420 - freq) / 300, 0, 1);
   const T = bowed ? 6 + 3 * low : 2.6 + 3.4 * low;
@@ -256,7 +258,7 @@ export function oceanDrum(E, dest, t, { dur = 7, vel = 0.6 }) {
 export function frameDrum(E, dest, t, { hit = 'dum', vel = 0.7 }) {
   const ctx = E.ctx;
   if (hit === 'dum') {
-    const end = t + 1.6, o = out(E, dest, 0.4 * vel, end);
+    const end = t + 1.6, o = out(E, dest, 0.32 * vel, end);
     const osc = sine(ctx, 98, t, end); osc.frequency.setTargetAtTime(63, t, 0.05);
     const g = egain(ctx, t, 1, 0.003, 0.2); osc.connect(g); g.connect(o);
     const m2 = sine(ctx, 63 * 1.59, t, t + 0.5), g2 = egain(ctx, t, 0.22, 0.002, 0.06); m2.connect(g2); g2.connect(o);
@@ -264,6 +266,7 @@ export function frameDrum(E, dest, t, { hit = 'dum', vel = 0.7 }) {
     n.connect(lp); lp.connect(gn); gn.connect(o); E.startNoise(n, t); n.stop(t + 0.2);
     return end;
   }
+  if (E.hp && E.hp.strikes.knuckle) return E.hp.strike(dest, t, hit === 'slap' ? 'slap' : 'knuckle', vel * 0.8);
   const end = t + 0.3, o = out(E, dest, 0.32 * vel, end);
   const n = E.noiseSource('white'), bp = filt(ctx, 'bandpass', 2300, 1.2), gn = egain(ctx, t, 1, 0.001, 0.022);
   n.connect(bp); bp.connect(gn); gn.connect(o); E.startNoise(n, t); n.stop(end);

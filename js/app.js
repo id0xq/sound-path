@@ -1,4 +1,5 @@
-// Сборка приложения: движок, природа, птицы, атмосфера, ритм, генераторы, дирижёр, голос, запись, живые звуки.
+// Сборка приложения: движок, ханг Handpan Sphere, природа, птицы, атмосфера, ритм, генераторы,
+// дирижёр, голос проводника, голос ведущего, повороты головы, запись, живые звуки.
 import { Engine } from './engine.js';
 import { Nature, Birds } from './nature.js';
 import { Tanpura, Binaural, Breath } from './atmos.js';
@@ -8,10 +9,15 @@ import { Conductor } from './conductor.js';
 import { Voice } from './voice.js';
 import { Recorder } from './recorder.js';
 import { Live } from './live.js';
+import { HandpanSamples } from './samples.js';
+import { Narrator } from './narrator.js';
+import { HeadTracker } from './headtrack.js';
 
 export class App {
-  async init() {
+  async init(onProgress) {
     const E = (this.E = await new Engine().init());
+    this.hp = E.hp = new HandpanSamples(E);
+    const loading = this.hp.load(onProgress);
     this.nature = new Nature(E);
     this.birds = new Birds(E);
     this.tanpura = new Tanpura(E);
@@ -21,16 +27,25 @@ export class App {
     this.rhythm = new Rhythm(this);
     this.gen = new Generators(this);
     this.voice = new Voice(E);
+    this.narrator = new Narrator(this);
     this.recorder = new Recorder(E, this.voice);
     this.live = new Live(this);
+    this.head = new HeadTracker(E, (s) => this.onHead && this.onHead(s));
     E.setSpaceLevel({ user: 1, scene: 0.55 });
+    await Promise.race([loading, new Promise((r) => setTimeout(r, 6000))]);
+    await this.narrator.init();
+
+    // Ведущий читает реплику, когда сюжет до неё доходит
+    this.conductor.on('line', ({ idx, speak }) => {
+      if (speak && this.narrator.on && this.conductor.running) this.narrator.speak(this.conductor.lines[idx], this.conductor.set.id);
+    });
+    this.conductor.on('end', () => this.narrator.stop());
 
     // Тикер в отдельном потоке: не засыпает в фоновой вкладке
     const src = 'let id=null;onmessage=e=>{clearInterval(id);if(e.data>0)id=setInterval(()=>postMessage(0),e.data)}';
     this.worker = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
     this.worker.onmessage = () => this.tick();
     this.worker.postMessage(50);
-    setTimeout(() => E.prewarmSpaces(), 1500);
     return this;
   }
   tick() {

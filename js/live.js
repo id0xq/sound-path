@@ -3,6 +3,7 @@
 import { polar, mtof, toPolar } from './util.js';
 import * as I from './instruments.js';
 import { scaleInRange, handpanNotes } from './theory.js';
+import { arc } from './generators.js';
 
 export const LIVE = [
   { id: 'bells', name: 'Колокольчики', key: '1', kind: 'bells' },
@@ -35,20 +36,24 @@ export class Live {
 
   place(life, { high = false, front = false } = {}) {
     const E = this.E, now = E.now;
-    if (this.mode === 'point') return { pos: polar(this.point.az, this.elevation, this.point.d) };
+    // из точки: звук стоит ровно там, близко и сухо — смена места слышна сразу
+    if (this.mode === 'point') return { pos: polar(this.point.az, this.elevation, Math.min(5, Math.max(1.6, this.point.d))), dry: true };
     if (this.mode === 'orbit') {
       const start = Math.random() * 360, rev = Math.max(0.5, Math.min(2, life / 10)), pts = [];
       const n = 16; for (let k = 0; k <= n; k++) pts.push({ t: now + (life * k) / n, pos: polar(start + this.orbitDir * 360 * rev * (k / n), this.elevation + 8 * Math.sin(k / 2), 2.8) });
       this.orbitDir *= -1;
       return { pos: pts[0].pos, path: pts };
     }
-    const az = front ? (Math.random() - 0.5) * 60 : (Math.random() - 0.5) * 260;
-    return { pos: polar(az, high ? 30 + Math.random() * 30 : Math.random() * 20, 2.4 + Math.random() * 2.5) };
+    // вокруг: каждый раз новое место, звук медленно плывёт по дуге
+    let az; do { az = front ? (Math.random() - 0.5) * 140 : (Math.random() - 0.5) * 340; } while (this._lastAz !== undefined && Math.abs(az - this._lastAz) < 50);
+    this._lastAz = az;
+    const pos = polar(az, high ? 30 + Math.random() * 30 : Math.random() * 20, 2.2 + Math.random() * 2.2);
+    return { pos, path: arc(pos, (Math.random() < 0.5 ? -1 : 1) * (20 + Math.random() * 30), now, now + Math.min(life, 12)) };
   }
 
   voice(kind, label, life, send = 0.4, opts) {
     const p = this.place(life, opts);
-    const em = this.E.spawn({ group: 'live', pos: p.pos, send, kind, label, life: this.E.now + life });
+    const em = this.E.spawn({ group: 'live', pos: p.pos, send: p.dry ? send * 0.5 : send, kind, label, life: this.E.now + life });
     if (p.path) em.path(p.path);
     return em;
   }

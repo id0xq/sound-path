@@ -1,6 +1,8 @@
 // Сюжеты сетов. Каждая глава задаёт пространство, строй, слои, ритм, движение звука и подсказку проводнику.
 // Время глав (at) — в секундах от начала. events: t — секунды от начала главы.
 // Поля, которых нет в главе, берутся из DEFAULTS. Можно свободно менять и добавлять главы.
+// Тексты ведущего по главам лежат в scripts.js.
+import { SCRIPTS, FREE_LINES } from './scripts.js';
 
 export const DEFAULTS = {
   space: 'temple', spaceMix: 0.55,
@@ -173,6 +175,8 @@ export const SETS = [
   },
 ];
 
+SETS.forEach((s) => s.chapters.forEach((ch, i) => { ch.script = (SCRIPTS[s.id] || [])[i] || []; }));
+
 // Свободная атмосфера: бесконечный поток глав, собранный из зерна вариации
 export function makeFreeSet(rng) {
   const spaces = ['temple', 'fog', 'cloud', 'infinity', 'forest', 'grotto'];
@@ -198,6 +202,7 @@ export function makeFreeSet(rng) {
       motion: rng.pick(['still', 'still', 'orbit', 'float']), binaural: rng.pick([6, 8, 10]), breath: rng.chance(0.2) ? 5.5 : 0, transition: 20,
       events: [{ t: 1, type: rng.pick(['bowl', 'koshi', 'tingsha', 'shimmer', 'rainstick']) }],
       cue: 'Свободная атмосфера. Ведите голосом, добавляйте звуки вживую — пространство само медленно меняется.',
+      script: [[6, rng.pick(FREE_LINES)], [rng.int(70, 110), rng.pick(FREE_LINES)], [rng.int(150, 190), rng.pick(FREE_LINES)]],
     });
     at += rng.int(200, 340);
   }

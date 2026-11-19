@@ -35,22 +35,22 @@ export class Nature {
       lfo.connect(d); d.connect(bp.frequency); lfo.start();
       n.connect(bp); const g2 = ctx.createGain(); g2.gain.value = 1.4; bp.connect(g2); return g2;
     }).connect(this.windGust);
-    const whistle = E.noiseSource('pink'), wbp = filt(ctx, 'bandpass', 1500, 7), wg = ctx.createGain(); wg.gain.value = 0.08;
+    const whistle = E.noiseSource('pink'), wbp = filt(ctx, 'bandpass', 900, 8), wg = ctx.createGain(); wg.gain.value = 0.035;
     const wl = ctx.createOscillator(); wl.frequency.value = 0.031; const wd = ctx.createGain(); wd.gain.value = 500; wl.connect(wd); wd.connect(wbp.frequency); wl.start();
     whistle.connect(wbp); wbp.connect(wg); wg.connect(this.windGust); E.startNoise(whistle, ctx.currentTime);
 
     // Листва
     const leaves = bed('leaves', 0.2);
     this.leafEnv = ctx.createGain(); this.leafEnv.gain.value = 0.3; this.leafEnv.connect(leaves);
-    stereoNoise('white', (n, ch) => { const hp = filt(ctx, 'highpass', ch ? 2800 : 3300, 0.5), lp = filt(ctx, 'lowpass', 9500, 0.5); n.connect(hp); hp.connect(lp); return lp; }).connect(this.leafEnv);
+    stereoNoise('pink', (n, ch) => { const bp = filt(ctx, 'bandpass', ch ? 1700 : 2100, 0.7), lp = filt(ctx, 'lowpass', 4800, 0.5), g2 = ctx.createGain(); g2.gain.value = 0.8; n.connect(bp); bp.connect(lp); lp.connect(g2); return g2; }).connect(this.leafEnv);
 
     // Ручей: точечный источник в пространстве + лёгкий широкий слой
     const streamWide = bed('stream', 0.2);
     this.streamEm = E.spawn({ group: 'nature', pos: polar(-35, -15, 9), send: 0.3, kind: 'water', label: 'ручей' });
     this.streamIn = ctx.createGain(); this.streamIn.gain.value = 0; this.streamIn.connect(this.streamEm.input);
-    const sn = E.noiseSource('pink'), sbp = filt(ctx, 'bandpass', 1300, 0.45), slp = filt(ctx, 'lowpass', 3200, 0.5), sg = ctx.createGain(); sg.gain.value = 1.3;
+    const sn = E.noiseSource('pink'), sbp = filt(ctx, 'bandpass', 900, 0.5), slp = filt(ctx, 'lowpass', 2400, 0.5), sg = ctx.createGain(); sg.gain.value = 1.1;
     sn.connect(sbp); sbp.connect(slp); slp.connect(sg); sg.connect(this.streamIn); E.startNoise(sn, ctx.currentTime);
-    stereoNoise('white', (n) => { const hp = filt(ctx, 'highpass', 2600), g2 = ctx.createGain(); g2.gain.value = 0.18; n.connect(hp); hp.connect(g2); return g2; }).connect(streamWide);
+    stereoNoise('pink', (n) => { const bp = filt(ctx, 'bandpass', 1600, 0.8), g2 = ctx.createGain(); g2.gain.value = 0.12; n.connect(bp); bp.connect(g2); return g2; }).connect(streamWide);
     this.streamPhase = Math.random();
 
     // Волны: два слоя, каждый накатывает своим ритмом
@@ -58,7 +58,7 @@ export class Nature {
     this.waveLayers = [0, 1].map((k) => {
       const n = E.noiseSource('pink'), lp = filt(ctx, 'lowpass', 400, 0.4), g2 = ctx.createGain(); g2.gain.value = 0.05;
       const p = ctx.createStereoPanner(); p.pan.value = k ? 0.5 : -0.5;
-      const foam = E.noiseSource('white'), fhp = filt(ctx, 'highpass', 4500), fg = ctx.createGain(); fg.gain.value = 0;
+      const foam = E.noiseSource('pink'), fhp = filt(ctx, 'bandpass', 2400, 0.7), fg = ctx.createGain(); fg.gain.value = 0;
       n.connect(lp); lp.connect(g2); g2.connect(p); foam.connect(fhp); fhp.connect(fg); fg.connect(p); p.connect(waves);
       E.startNoise(n, ctx.currentTime); E.startNoise(foam, ctx.currentTime);
       return { lp, g: g2, fg, p, next: ctx.currentTime + k * 4.5 };
@@ -66,7 +66,7 @@ export class Nature {
 
     // Дождь: мягкий шелест + капли
     const rain = bed('rain', 0.25);
-    stereoNoise('pink', (n) => { const hp = filt(ctx, 'highpass', 900), lp = filt(ctx, 'lowpass', 7000), g2 = ctx.createGain(); g2.gain.value = 0.7; n.connect(hp); hp.connect(lp); lp.connect(g2); return g2; }).connect(rain);
+    stereoNoise('pink', (n) => { const hp = filt(ctx, 'highpass', 500), lp = filt(ctx, 'lowpass', 3800), g2 = ctx.createGain(); g2.gain.value = 0.55; n.connect(hp); hp.connect(lp); lp.connect(g2); return g2; }).connect(rain);
     this.dropsN = E.noiseSource('white'); const dbp = filt(ctx, 'bandpass', 3800, 2); this.dropsG = ctx.createGain(); this.dropsG.gain.value = 0;
     this.dropsP = ctx.createStereoPanner();
     this.dropsN.connect(dbp); dbp.connect(this.dropsG); this.dropsG.connect(this.dropsP); this.dropsP.connect(rain); E.startNoise(this.dropsN, ctx.currentTime);

@@ -1,12 +1,19 @@
 // Генеративные голоса сета: ханг, облако из нот ханга, колокольчики, окарина (зов и отклик), калимба
 // и сюжетные события: чаша, гонг, тингши, дождевая палка, хоровод колокольчиков, «луч», стайка птиц.
-import { polar, mtof, clamp } from './util.js';
+import { polar, mtof, clamp, toPolar } from './util.js';
+
+// Дуга движения: звук плывёт вокруг головы на deg градусов за время жизни (движение помогает слуху точно услышать место)
+export function arc(pos, deg, t0, t1, dEl = 0, n = 5) {
+  const p = toPolar(pos), pts = [];
+  for (let k = 0; k <= n; k++) { const u = k / n; pts.push({ t: t0 + (t1 - t0) * u, pos: polar(p.az + deg * u, Math.max(-20, Math.min(85, p.el + dEl * u)), p.d) }); }
+  return pts;
+}
 import * as I from './instruments.js';
 import { scaleInRange } from './theory.js';
 
 export const EVENT_NAMES = {
   bowl: 'Чаша', bowlSing: 'Поющая чаша', tingsha: 'Тингши', koshi: 'Колокольчики', gong: 'Гонг', rainstick: 'Дождевая палка',
-  chimesOrbit: 'Хоровод колокольчиков', shimmer: 'Луч', flyby: 'Стайка птиц', oceanDrum: 'Океанский барабан',
+  chimesOrbit: 'Хоровод колокольчиков', shimmer: 'Луч', flyby: 'Стайка птиц', oceanDrum: 'Океанский барабан', dissolve: 'Растворение',
 };
 
 export class Generators {
@@ -28,7 +35,7 @@ export class Generators {
       case 'float': return polar(r.range(-180, 180), r.range(25, 60), r.range(3, 7));
       case 'walk': return polar(r.range(-30, 30), high ? r.range(25, 50) : r.range(0, 10), r.range(2.4, 3.8));
       default:
-        if (front) return polar(r.range(-35, 35), r.range(-5, 10), r.range(2.2, 3.4));
+        if (front) return polar(r.range(-70, 70), r.range(-5, 15), r.range(2.2, 3.4));
         return polar(r.range(-140, 140), high ? r.range(25, 60) : r.range(0, 25), r.range(2.6, 5));
     }
   }
@@ -58,8 +65,12 @@ export class Generators {
     const withRhythm = rh.active;
     let t = withRhythm ? rh.nextBeat(now + 0.25) : now + 0.2;
     const unit = withRhythm ? rh.beatDur() / 2 : r.range(0.32, 0.55);
-    const em = E.spawn({ group: 'instr', pos: this.pos(S, now, { front: true }), send: 0.4, kind: 'handpan', label: 'ханг' });
-    if (S.motion === 'orbit') { const p0 = this.pos(S, now), p1 = this.pos(S, now + 6); em.path([{ t, pos: p0 }, { t: t + 6, pos: p1 }]); }
+    // фразы приходят то слева, то справа и медленно плывут по дуге
+    this.hpSide = -(this.hpSide || 1);
+    const p0 = S.motion === 'still' ? polar(this.hpSide * r.range(20, 115), r.range(-5, 20), r.range(2, 3.4)) : this.pos(S, now, { front: true });
+    const em = E.spawn({ group: 'instr', pos: p0, send: 0.4, kind: 'handpan', label: 'ханг' });
+    const phraseLen = seq.length * unit * 2.2 + 3;
+    em.path(arc(p0, (S.motion === 'orbit' ? 60 : 30) * this.hpSide * -1 * r.range(0.6, 1.3), t, t + phraseLen, r.range(-5, 10)));
     let end = t;
     seq.forEach((ix, i) => {
       const arch = Math.sin(Math.PI * (i + 0.5) / seq.length);
@@ -83,7 +94,7 @@ export class Generators {
     const em = E.spawn({ group: 'atmos', pos, send: 0.95, kind: 'wash', label: 'облако' });
     const end = I.handpan(E, em.input, t, { freq: mtof(m), vel: r.range(0.35, 0.6), bright: 0.3, bowed: true });
     em.end = end; em.glow = 0.7; E.after(end, () => em.dispose());
-    if (S.motion === 'orbit' || S.motion === 'float') em.path([{ t, pos }, { t: end, pos: polar(r.range(-180, 180), r.range(20, 70), r.range(4, 9)) }]);
+    em.path(arc(pos, r.sign() * r.range(40, S.motion === 'orbit' ? 160 : 90), t, end, r.range(5, 25)));
     this.next.wash = now + r.range(0.6, 1.4) * (1.4 + (1 - d) * 7);
   }
 
@@ -94,6 +105,7 @@ export class Generators {
     const t = now + 0.1, pos = this.pos(S, now, { high: true });
     const em = E.spawn({ group: 'instr', pos, send: 0.55, kind: 'bells', label: 'колокольчики' });
     const end = I.koshiStrum(E, em.input, t, { freqs: pool, count: r.int(3, 8), spread: r.range(0.8, 2.5), vel: 0.5 });
+    em.path(arc(pos, r.sign() * r.range(60, 140), t, t + 4, r.range(-10, 10)));
     em.end = end; em.glow = 0.8; E.after(end, () => em.dispose());
     this.next.bells = now + r.range(0.6, 1.5) * (5 + (1 - d) * 28);
   }
@@ -114,6 +126,7 @@ export class Generators {
       const pos = polar(az, r.range(4, 16), r.range(10, 18));
       const em = E.spawn({ group: 'instr', pos, send: 0.55, kind: 'ocarina', label: 'окарина' });
       const end = I.ocarina(E, em.input, t, notes, { vel: 0.7, breath: 0.6 });
+      em.path(arc(pos, r.sign() * r.range(10, 25), t, end));
       em.end = end; em.glow = 0.9; E.after(end, () => em.dispose());
       return end;
     };
@@ -135,7 +148,9 @@ export class Generators {
   kalimbaPhrase(now, S, d) {
     const r = this.rng, E = this.E, C = this.C;
     const pool = scaleInRange(S.tuning, C.ding, C.ding + 12, C.ding + 31, { pentatonic: true });
-    const em = E.spawn({ group: 'instr', pos: polar(r.range(25, 70), r.range(-5, 15), r.range(2.2, 3.2)), send: 0.35, kind: 'kalimba', label: 'калимба' });
+    const kp = polar(r.sign() * r.range(30, 120), r.range(-5, 15), r.range(2.2, 3.2));
+    const em = E.spawn({ group: 'instr', pos: kp, send: 0.35, kind: 'kalimba', label: 'калимба' });
+    em.path(arc(kp, r.sign() * r.range(25, 50), now, now + 5));
     let t = now + 0.15, i = r.int(0, pool.length - 4), end = t;
     const n = r.int(4, 9), u = this.app.rhythm.active ? this.app.rhythm.beatDur() / 2 : r.range(0.18, 0.3);
     for (let k = 0; k < n; k++) {
@@ -188,6 +203,7 @@ export class Generators {
         return one(polar(0, 78, 3), 'wash', 'луч', 0.8, (d) => I.shimmer(E, d, t, { freqs: fr, dur: 10, vel: 0.7 }));
       }
       case 'flyby': this.app.birds.flyby(t); return null;
+      case 'dissolve': setTimeout(() => E.dissolve(10), Math.max(0, (t - E.now) * 1000)); return null;
     }
     return null;
   }

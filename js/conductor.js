@@ -40,8 +40,25 @@ export class Conductor {
     this.curDing = this.ding + (this.set.chapters[0].root || 0);
     this.state = merge(DEFAULTS, this.set.chapters[0]);
     this.elapsed = 0; this.chapterIdx = -1;
+    // все реплики ведущего на общей шкале времени
+    this.lines = [];
+    this.set.chapters.forEach((ch, ci) => (ch.script || []).forEach(([t, text], li) => this.lines.push({ at: ch.at + t, text, ci, li, key: `c${ci}l${li}` })));
+    this.lineIdx = -1; this.viewIdx = null;
     this.emit('load', this.set);
+    this.emit('line', { idx: -1 });
   }
+
+  lineIndexAt(t) { let i = -1; while (i + 1 < this.lines.length && this.lines[i + 1].at <= t) i++; return i; }
+  get shownLine() { return this.viewIdx !== null ? this.viewIdx : this.lineIdx; }
+  // Листать реплики вручную (звук и сюжет при этом идут своим ходом)
+  stepLine(dir) {
+    if (!this.lines.length) return;
+    const cur = this.shownLine < 0 ? (dir > 0 ? -1 : 0) : this.shownLine;
+    this.viewIdx = Math.max(0, Math.min(this.lines.length - 1, cur + dir));
+    if (this.viewIdx === this.lineIdx) this.viewIdx = null;
+    this.emit('line', { idx: this.shownLine, manual: true });
+  }
+  followLine() { this.viewIdx = null; this.emit('line', { idx: this.lineIdx }); }
 
   chapterIndexAt(t) {
     const ch = this.set.chapters; let i = 0;
@@ -65,7 +82,7 @@ export class Conductor {
   // Завершить: всё мягко уходит в тишину
   stop(quick = false) {
     const E = this.E, now = E.now, fade = quick ? 1.5 : 6;
-    this.running = false; this.held = false; this.elapsed = 0;
+    this.running = false; this.held = false; this.elapsed = 0; this.lineIdx = -1; this.viewIdx = null;
     E.musicSum.gain.cancelScheduledValues(now);
     E.musicSum.gain.setValueAtTime(E.musicSum.gain.value, now);
     E.musicSum.gain.linearRampToValueAtTime(0, now + fade);
@@ -92,6 +109,11 @@ export class Conductor {
     if (!this.set) return;
     idx = Math.max(0, Math.min(this.set.chapters.length - 1, idx));
     this.elapsed = this.set.chapters[idx].at + 0.01;
+    // при переходе показываем первую реплику главы; ведущий прочтёт её, когда до неё дойдёт время
+    const first = this.lines.findIndex((l) => l.ci === idx);
+    this.lineIdx = first >= 0 ? first - 1 : this.lineIndexAt(this.elapsed); this.viewIdx = null;
+    if (this.app.narrator) this.app.narrator.stop();
+    this.emit('line', { idx: first >= 0 ? first : this.lineIdx, seek: true });
     if (this.running) this.applyChapter(idx, 4);
     else {
       this.chapterIdx = -1; this.state = merge(DEFAULTS, this.set.chapters[idx]);
@@ -154,6 +176,12 @@ export class Conductor {
       if (!this.held) this.elapsed += dt;
       const idx = this.chapterIndexAt(this.elapsed);
       if (idx !== this.chapterIdx) this.applyChapter(idx, this.set.chapters[idx].transition ?? DEFAULTS.transition);
+      const li = this.lineIndexAt(this.elapsed);
+      if (li !== this.lineIdx) {
+        const natural = li === this.lineIdx + 1;
+        this.lineIdx = li; this.viewIdx = null;
+        this.emit('line', { idx: li, speak: natural });
+      }
       for (const ev of this.pendingEvents) {
         if (!ev.done && this.elapsed >= ev.at - 0.4) { ev.done = true; A.gen.fire(ev.type, now + Math.max(0.05, ev.at - this.elapsed), this.state); }
       }

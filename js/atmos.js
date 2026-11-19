@@ -4,9 +4,9 @@ import { mtof, clamp } from './util.js';
 const rnd = (a, b) => a + Math.random() * (b - a);
 
 const TIMBRES = {
-  warm: { name: 'Тёплый', osc: ['sawtooth', 'triangle'], detune: 7, cutoff: 820, q: 0.4, level: 0.1 },
-  choir: { name: 'Хор', osc: ['sawtooth', 'sawtooth'], detune: 9, formants: [[730, 1, 9], [1090, 0.55, 11], [2440, 0.22, 13]], level: 0.15 },
-  glass: { name: 'Стекло', osc: ['sine', 'triangle'], detune: 4, cutoff: 5200, q: 0.2, level: 0.11, octave: true },
+  warm: { name: 'Тёплый', osc: ['triangle', 'sine'], detune: 6, cutoff: 1300, q: 0.3, level: 0.22 },
+  choir: { name: 'Хор', osc: ['sawtooth', 'triangle'], detune: 8, formants: [[620, 1, 7], [1040, 0.5, 9], [2300, 0.1, 10]], level: 0.2 },
+  glass: { name: 'Стекло', osc: ['sine', 'sine'], detune: 4, cutoff: 6000, q: 0.2, level: 0.19, octave: true },
 };
 
 // Пэд из нескольких голосов; каждый голос — пара расстроенных генераторов, разнесённых по стерео.
@@ -17,8 +17,10 @@ export class Pad {
     this.breath = ctx.createGain(); this.breath.gain.value = 1;
     this.out.connect(this.breath);
     const g = E.groups[groupName];
-    this.dry = ctx.createGain(); this.dry.gain.value = 0.55; this.send = ctx.createGain(); this.send.gain.value = 0.9;
+    this.dry = ctx.createGain(); this.dry.gain.value = 0.5; this.send = ctx.createGain(); this.send.gain.value = 0.45;
     this.breath.connect(this.dry); this.breath.connect(this.send); this.dry.connect(g.dry); this.send.connect(g.send);
+    // пэд целиком «живёт» в атмосферном хвосте — мягкое облако вместо шума
+    this.atm = ctx.createGain(); this.atm.gain.value = 0.9; this.breath.connect(this.atm); this.atm.connect(g.atmos);
     this.voices = [];
     this.T = T;
     // медленное «дыхание» фильтра
@@ -87,6 +89,7 @@ export class Tanpura {
     this.out.connect(this.pan);
     const d = ctx.createGain(); d.gain.value = 0.6; const s = ctx.createGain(); s.gain.value = 0.7;
     this.pan.connect(d); this.pan.connect(s); d.connect(g.dry); s.connect(g.send);
+    const at = ctx.createGain(); at.gain.value = 0.5; this.pan.connect(at); at.connect(g.atmos);
     this.root = 52; this.next = 0; this.step = 0; this.level = 0; this.cycle = rnd(4.6, 5.4);
   }
   setRoot(m) { this.root = m; }

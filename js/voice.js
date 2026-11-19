@@ -71,7 +71,7 @@ export class Voice {
       const bp = f('bandpass', 220 * (i + 1), 45);
       const g = ctx.createGain(); g.gain.value = 9;
       const p = ctx.createStereoPanner(); p.pan.value = Math.sin(i * 2.4) * 0.85;
-      this.resIn.connect(bp); bp.connect(g); g.connect(p); p.connect(rg.dry); p.connect(rg.send);
+      this.resIn.connect(bp); bp.connect(g); g.connect(p); p.connect(rg.dry); p.connect(rg.send); p.connect(rg.atmos);
       this.resBands.push(bp);
     }
     E.setGroup('resonance', { user: 1, scene: 0.5 });

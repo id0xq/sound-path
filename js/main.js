@@ -23,7 +23,8 @@ const store = {
 $('#enter').addEventListener('click', async () => {
   const btn = $('#enter'); btn.disabled = true; btn.textContent = 'Открываю пространство…';
   try {
-    await app.init();
+    $('#gateProgress').hidden = false;
+    await app.init((k) => { $('#gateProgress div').style.width = Math.round(k * 100) + '%'; });
     await app.E.ctx.resume();
     boot();
     $('#gate').classList.add('hide');
@@ -39,16 +40,19 @@ function boot() {
   const C = app.conductor, E = app.E;
   sphere = new Sphere($('#dome'), app);
   buildSpaces(); buildSets(); buildPads(); buildHang(); bindHang(); buildMixer(); bindVoice(); bindRecorder(); bindSettings(); bindPlacement(); bindKeys();
+  bindLines(); bindNarrator(); bindHead(); bindViz();
 
   C.on('load', renderSet);
   C.on('chapter', ({ idx, ch }) => {
     document.documentElement.style.setProperty('--chapter', ch.color || '#7fc4c0');
     sphere.tint = ch.color || '#7fc4c0';
-    $('#cueTitle').textContent = ch.title; $('#cueText').textContent = ch.cue || '';
+    $('#cueTitle').textContent = ch.title;
+    if (!C.lines.length) $('#cueText').textContent = ch.cue || '';
     $$('#chapters li').forEach((li, i) => { li.classList.toggle('now', i === idx); li.classList.toggle('done', i < idx); });
     buildHang();
   });
   C.on('state', syncTransport);
+  C.on('line', renderLine);
   C.on('end', () => {
     $('#cueNext').textContent = 'Сет завершён. Спасибо.';
     if (app.recorder.active && recWithSet) setTimeout(() => stopRecording(), 2500);
@@ -92,10 +96,11 @@ function buildSets() {
     });
     box.appendChild(b);
   }
-  $('#playBtn').addEventListener('click', startSet);
+  $('#playBtn').addEventListener('click', () => startSet(false));
+  $('#guidedBtn').addEventListener('click', () => startSet(true));
   $('#holdBtn').addEventListener('click', () => app.conductor.hold());
   $('#stopBtn').addEventListener('click', () => {
-    app.conductor.stop();
+    app.conductor.stop(); app.narrator.stop();
     if (app.recorder.active && recWithSet) setTimeout(() => stopRecording(), 6500);
     releaseWake();
   });
@@ -107,9 +112,11 @@ function buildSets() {
   $('#tempo').addEventListener('input', (e) => { const v = Number(e.target.value); $('#tempoOut').value = Math.round(v * 100) + '%'; app.conductor.setTempoFactor(v); });
 }
 
-async function startSet() {
+async function startSet(withVoice) {
   const C = app.conductor;
   if (C.running) return;
+  app.narrator.on = !!withVoice; $('#narrOn').checked = !!withVoice;
+  if ('speechSynthesis' in window && withVoice) speechSynthesis.speak(new SpeechSynthesisUtterance(' ')); // разрешение звука речи на iPhone
   await app.E.ctx.resume();
   if (!C.set) C.load(setId, Number($('#seed').value) || 1);
   C.start();
@@ -142,7 +149,9 @@ function renderSet(set) {
 
 function syncTransport() {
   const C = app.conductor;
-  $('#playBtn').disabled = C.running; $('#playBtn').textContent = C.running ? 'Сет идёт' : C.elapsed > 0 ? 'Начать с этой главы' : 'Начать сет';
+  $('#playBtn').disabled = C.running; $('#guidedBtn').disabled = C.running;
+  $('#guidedBtn').textContent = C.running ? (app.narrator.on ? 'Ведущий ведёт медитацию' : 'Сет идёт') : C.elapsed > 0 ? 'Медитация с голосом с этой главы' : 'Медитация с голосом';
+  $('#playBtn').textContent = C.elapsed > 0 && !C.running ? 'Вести самому с этой главы' : 'Вести самому';
   $('#holdBtn').disabled = !C.running; $('#stopBtn').disabled = !C.running;
   $('#holdBtn').setAttribute('aria-pressed', String(C.held)); $('#holdBtn').textContent = C.held ? 'Продолжить сюжет' : 'Задержать главу';
 }
@@ -195,7 +204,7 @@ function buildHang() {
   const svg = $('#hang'); if (!svg || !app.live) return;
   const notes = app.live.notes();
   const n = notes.length - 1;
-  const parts = [`<defs><radialGradient id="hangShell" cx="40%" cy="35%" r="75%"><stop offset="0%" stop-color="#5a4a33"/><stop offset="60%" stop-color="#3a3024"/><stop offset="100%" stop-color="#211c16"/></radialGradient></defs>`,
+  const parts = [`<defs><radialGradient id="hangShell" cx="40%" cy="35%" r="75%"><stop offset="0%" stop-color="#6d8796"/><stop offset="55%" stop-color="#344b5a"/><stop offset="100%" stop-color="#16242e"/></radialGradient></defs>`,
     '<circle class="shell" r="108"/>'];
   const pos = [];
   for (let i = 0; i < n; i++) {
@@ -296,7 +305,8 @@ function buildMixer() {
   const saved = store.get('mix', {});
   const rows = [
     ['atmos', 'Атмосфера', 1], ['nature', 'Природа', 1], ['birds', 'Птицы', 1], ['instr', 'Инструменты сюжета', 1],
-    ['rhythm', 'Ритм', 1], ['live', 'Живые звуки', 1], ['space', 'Пространство', 1], ['binaural', 'Бинауральный тон', 0.5], ['resonance', 'Резонанс мира', 1],
+    ['rhythm', 'Ритм', 1], ['live', 'Живые звуки', 1], ['space', 'Пространство', 1], ['atmosTail', 'Атмосферный хвост', 1],
+    ['narrator', 'Голос ведущего', 1], ['binaural', 'Бинауральный тон', 0.5], ['resonance', 'Резонанс мира', 1],
   ];
   for (const [k, name, def] of rows) {
     const v = saved[k] ?? def;
@@ -308,6 +318,8 @@ function buildMixer() {
       const val = Number(input.value); out.value = Math.round(val * 100) + '%';
       if (k === 'space') E.setSpaceLevel({ user: val, tau: 0.1 });
       else if (k === 'binaural') { app.binaural.user = val; app.binaural.apply(0.3); }
+      else if (k === 'atmosTail') E.setAtmosLevel(val);
+      else if (k === 'narrator') app.narrator.out.gain.setTargetAtTime(1.15 * val, E.now, 0.05);
       else E.setGroup(k, { user: val });
       saved[k] = val; store.set('mix', saved);
     };
@@ -320,7 +332,7 @@ function buildMixer() {
       $(panel).hidden = !open; $(btn).setAttribute('aria-expanded', String(open));
     });
   };
-  toggle('#mixerBtn', '#mixer'); toggle('#settingsBtn', '#settings');
+  toggle('#mixerBtn', '#mixer'); toggle('#settingsBtn', '#settings'); toggle('#narratorBtn', '#narratorPanel');
   $$('[data-close]').forEach((b) => b.addEventListener('click', () => { b.closest('.drawer').hidden = true; $$('.top-tools .btn').forEach((x) => x.setAttribute('aria-expanded', 'false')); }));
   window.addEventListener('keydown', (e) => { if (e.key === 'Escape') $$('.drawer').forEach((d) => (d.hidden = true)); });
   $('#hpVol').addEventListener('input', (e) => E.setHeadphones(Number(e.target.value)));
@@ -391,13 +403,14 @@ async function stopRecording() {
 // ---------- Настройки ----------
 function bindSettings() {
   const E = app.E;
-  const soft = store.get('softness', 0.6); $('#softness').value = soft; E.setSoftness(soft);
-  $('#softness').addEventListener('input', (e) => { E.setSoftness(Number(e.target.value)); store.set('softness', Number(e.target.value)); });
+  const soft = store.get('softness2', 0.4); $('#softness').value = soft; E.setSoftness(soft);
+  $('#softness').addEventListener('input', (e) => { E.setSoftness(Number(e.target.value)); store.set('softness2', Number(e.target.value)); });
   $$('#a4 button').forEach((b) => b.addEventListener('click', () => {
     $$('#a4 button').forEach((x) => x.setAttribute('aria-checked', String(x === b))); A4.a4 = Number(b.dataset.a4); store.set('a4', A4.a4);
   }));
   const a4 = store.get('a4', 440); A4.a4 = a4; $$('#a4 button').forEach((x) => x.setAttribute('aria-checked', String(Number(x.dataset.a4) === a4)));
   $('#hrtf').addEventListener('change', (e) => { E.hrtf = e.target.checked; });
+  $('#dissolveBtn').addEventListener('click', () => E.dissolve(10));
   $('#binauralOn').addEventListener('change', (e) => { app.binaural.enabled = e.target.checked; app.binaural.apply(0.5); });
   $('#wake').addEventListener('change', (e) => { if (!e.target.checked) releaseWake(); else if (app.conductor.running) requestWake(); });
 }
@@ -409,3 +422,117 @@ async function requestWake() {
 function releaseWake() { if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; } }
 
 function escapeHtml(s) { return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+
+// ---------- Реплики ведущего (телесуфлёр) ----------
+function renderLine({ idx, manual } = {}) {
+  const C = app.conductor, L = C.lines;
+  const i = idx ?? C.shownLine;
+  const cur = L[i], prev = L[i - 1];
+  const el = $('#cueText');
+  const text = cur ? cur.text : (C.set && !C.running ? 'Нажмите «Медитация с голосом» — ведущий проведёт всё сам. Или «Вести самому» — тогда эти слова будут подсказками для вас.' : '');
+  if (el.textContent !== text) {
+    el.classList.add('fade');
+    setTimeout(() => { el.textContent = text; el.classList.remove('fade'); }, manual ? 60 : 380);
+  }
+  $('#cuePrev').textContent = prev ? prev.text : '';
+  $('#cueCount').textContent = L.length ? `${Math.max(0, i + 1)} из ${L.length}${C.viewIdx !== null ? ', вручную: нажмите, чтобы вернуться' : ''}` : '';
+  $('#linePrev').disabled = i <= 0; $('#lineNext').disabled = i >= L.length - 1;
+}
+function bindLines() {
+  $('#linePrev').addEventListener('click', () => app.conductor.stepLine(-1));
+  $('#lineNext').addEventListener('click', () => app.conductor.stepLine(1));
+  $('#cueCount').addEventListener('click', () => app.conductor.followLine());
+  window.addEventListener('keydown', (e) => {
+    const tag = (e.target.tagName || '').toLowerCase(); if (tag === 'input' && e.target.type === 'text') return;
+    if (e.key === 'ArrowLeft') { app.conductor.stepLine(-1); e.preventDefault(); }
+    if (e.key === 'ArrowRight') { app.conductor.stepLine(1); e.preventDefault(); }
+  });
+}
+
+// ---------- Голос ведущего ----------
+function bindNarrator() {
+  const N = app.narrator;
+  const saved = store.get('narr', {});
+  N.rate = saved.rate ?? 0.86; N.volume = saved.volume ?? 1;
+  $('#narrRate').value = N.rate; $('#narrVol').value = N.volume;
+  const fillVoices = () => {
+    const list = N.systemVoices(), sel = $('#sysVoice');
+    sel.innerHTML = list.length ? list.map((v, i) => `<option value="${i}">${escapeHtml(v.name)}</option>`).join('') : '<option>Русских голосов в системе нет</option>';
+    const want = saved.voice && list.findIndex((v) => v.name === saved.voice);
+    if (want >= 0) { sel.value = want; N.sysVoice = list[want]; } else if (list[0]) N.sysVoice = list[0];
+  };
+  fillVoices(); if ('speechSynthesis' in window) speechSynthesis.addEventListener('voiceschanged', fillVoices);
+  if (N.packs.length) {
+    $('#packRow').hidden = false;
+    $('#packSel').innerHTML = '<option value="">не использовать</option>' + N.packs.map((p) => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('');
+    $('#packSel').value = N.pack;
+    $('#packSel').addEventListener('change', (e) => { N.pack = e.target.value; });
+  }
+  const save = () => store.set('narr', { rate: N.rate, volume: N.volume, voice: N.sysVoice && N.sysVoice.name });
+  $('#sysVoice').addEventListener('change', (e) => { N.sysVoice = N.systemVoices()[+e.target.value]; save(); });
+  $('#narrRate').addEventListener('input', (e) => { N.rate = +e.target.value; save(); });
+  $('#narrVol').addEventListener('input', (e) => { N.volume = +e.target.value; save(); });
+  $('#narrOn').addEventListener('change', (e) => { N.on = e.target.checked; if (!N.on) N.stop(); syncTransport(); });
+  $('#narrTest').addEventListener('click', () => {
+    const C = app.conductor, line = C.lines[Math.max(0, C.shownLine)] || { text: 'Сделайте медленный вдох… и мягкий выдох.', key: 'test' };
+    const was = N.on; N.on = true; N.speak(line, C.set ? C.set.id : 'test'); N.on = was;
+  });
+  app.conductor.on('load', renderOwnLines);
+  renderOwnLines();
+}
+function renderOwnLines() {
+  const C = app.conductor, N = app.narrator, ol = $('#ownLines'); if (!ol || !C.set) return;
+  ol.innerHTML = '';
+  let lastCh = -1;
+  C.lines.forEach((ln) => {
+    const key = `${C.set.id}:${ln.key}`, li = document.createElement('li');
+    if (ln.ci !== lastCh) { const h = document.createElement('span'); h.className = 'ch'; h.textContent = C.set.chapters[ln.ci].title; li.appendChild(h); lastCh = ln.ci; }
+    const tx = document.createElement('span'); tx.className = 'tx'; tx.textContent = ln.text;
+    const act = document.createElement('span'); act.className = 'act';
+    const rec = document.createElement('button'), play = document.createElement('button'), del = document.createElement('button');
+    rec.textContent = '● запись'; play.textContent = '▶'; del.textContent = '✕';
+    play.title = 'Послушать'; del.title = 'Удалить запись';
+    const sync = () => { const has = N.ownKeys.has(key); play.hidden = del.hidden = !has; rec.classList.toggle('has', has); rec.textContent = has ? '● заново' : '● запись'; };
+    rec.addEventListener('click', async () => {
+      try {
+        if (N.rec && N.rec.key === key) { await N.stopRecording(); rec.classList.remove('rec-on'); sync(); return; }
+        if (N.rec) return;
+        await N.startRecording(key); rec.classList.add('rec-on'); rec.textContent = '■ стоп';
+      } catch (e) { alert('Не получилось записать: ' + e.message); }
+    });
+    play.addEventListener('click', () => N.previewOwn(key));
+    del.addEventListener('click', async () => { await N.removeOwn(key); sync(); });
+    act.append(rec, play, del); sync();
+    li.append(tx, act); ol.appendChild(li);
+  });
+}
+
+// ---------- Поворот головы ----------
+function bindHead() {
+  const H = app.head;
+  app.onHead = () => {};
+  $$('#headMode button').forEach((b) => b.addEventListener('click', async () => {
+    const mode = b.dataset.head, hint = $('#placeHint');
+    try {
+      if (mode === 'off') H.stop();
+      else if (mode === 'camera') { hint.textContent = 'Включаю камеру и загружаю распознавание лица…'; $('#camPreview').hidden = false; await H.startCamera($('#camPreview')); hint.textContent = 'Поворачивайте голову — звуки останутся на своих местах. Камера остаётся на этом устройстве.'; }
+      else { await H.startGyro(); hint.textContent = 'Держите телефон перед собой и поворачивайтесь — сцена останется на месте.'; }
+      $$('#headMode button').forEach((x) => x.setAttribute('aria-checked', String(x === b)));
+      $('#recenter').hidden = mode === 'off';
+      if (mode !== 'camera') $('#camPreview').hidden = true;
+    } catch (e) {
+      H.stop(); $('#camPreview').hidden = true;
+      $$('#headMode button').forEach((x) => x.setAttribute('aria-checked', String(x.dataset.head === 'off')));
+      hint.textContent = 'Не получилось: ' + e.message;
+    }
+  }));
+  $('#recenter').addEventListener('click', () => H.recenter());
+}
+
+// ---------- Виды визуализации ----------
+function bindViz() {
+  const saved = store.get('viz', 'dome');
+  const set = (m) => { sphere.setMode(m); $$('#vizModes button').forEach((x) => x.setAttribute('aria-checked', String(x.dataset.viz === m))); store.set('viz', m); };
+  $$('#vizModes button').forEach((b) => b.addEventListener('click', () => set(b.dataset.viz)));
+  set(saved);
+}
