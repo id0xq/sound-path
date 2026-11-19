@@ -62,7 +62,7 @@ export const SETS = [
         birds: 0.7, species: ['robin', 'thrush', 'tit', 'chaffinch', 'nightingale'],
         nature: { wind: 0.18, leaves: 0.2, stream: 0.12 }, rhythm: null,
         motion: 'still', binaural: 8, transition: 12,
-        events: [{ t: 0, type: 'tingsha' }, { t: 5, type: 'shimmer' }, { t: 35, type: 'chimesOrbit' }, { t: 170, type: 'koshi' }, { t: 240, type: 'shimmer' }],
+        events: [{ t: 0, type: 'tingsha' }, { t: 5, type: 'shimmer' }, { t: 35, type: 'chimesOrbit' }, { t: 120, type: 'chimes' }, { t: 170, type: 'koshi' }, { t: 240, type: 'shimmer' }],
         cue: 'Остановитесь. Поднимите взгляд. Пространство раскрывается — услышьте, как звон кружит над головой. Вдохните, будто вдыхаете свет. Можно на минуту закрыть глаза и просто слушать птиц.',
       },
       {
@@ -92,7 +92,7 @@ export const SETS = [
         birds: 0.35, species: ['robin', 'thrush', 'distant'],
         nature: { wind: 0.25, leaves: 0.15 }, rhythm: null,
         motion: 'still', binaural: 8, transition: 10,
-        events: [{ t: 3, type: 'bowl' }, { t: 16, type: 'bowl' }, { t: 29, type: 'bowl' }, { t: 60, type: 'tingsha' }],
+        events: [{ t: 3, type: 'bowl' }, { t: 16, type: 'bowl' }, { t: 29, type: 'bowl' }, { t: 45, type: 'crystal' }, { t: 60, type: 'tingsha' }],
         cue: 'Остановитесь. Три удара чаши — три вдоха. Поблагодарите путь и себя. Постойте в тишине, слушая птиц. Когда будете готовы — медленно снимите наушники.',
       },
     ],
@@ -111,7 +111,7 @@ export const SETS = [
         space: 'temple', spaceMix: 0.65, tuning: 'astra', chord: [-12, 0, 7, 12],
         pad: { timbre: 'choir', level: 0.32 }, tanpura: 0.55, bells: 0.04,
         birds: 0.06, species: ['dove'], nature: { rain: 0.25 }, binaural: 10,
-        events: [{ t: 3, type: 'gong' }, { t: 28, type: 'bowl' }, { t: 75, type: 'bowl' }],
+        events: [{ t: 3, type: 'gong' }, { t: 28, type: 'bowl' }, { t: 75, type: 'bowl' }, { t: 150, type: 'fork' }],
         cue: 'Добро пожаловать. Устройтесь удобно, сидя или лёжа. Наушники — плотно. Закройте глаза. Гонг открывает пространство: просто слушайте, как звук наполняет купол.',
       },
       {
@@ -127,7 +127,7 @@ export const SETS = [
         space: 'temple', spaceMix: 0.6, tuning: 'astra', chord: [-12, 0, 7, 12, 16, 19],
         pad: { timbre: 'warm', level: 0.26 }, tanpura: 0.15, handpan: 0.35, wash: 0.35, bells: 0.2,
         birds: 0.15, species: ['dove', 'robin'], nature: { stream: 0.2 }, breath: 5.5, binaural: 6,
-        events: [{ t: 0, type: 'bowl' }, { t: 130, type: 'shimmer' }, { t: 290, type: 'koshi' }],
+        events: [{ t: 0, type: 'bowl' }, { t: 60, type: 'crystal' }, { t: 130, type: 'shimmer' }, { t: 210, type: 'monochord' }, { t: 290, type: 'koshi' }],
         cue: 'Поблагодарите своё тело. Стопы, которые вас носят. Руки, которые обнимают. Сердце, которое бьётся не переставая. Пройдите вниманием по телу и в каждом месте скажите про себя «спасибо».',
       },
       {
@@ -143,7 +143,7 @@ export const SETS = [
         space: 'cloud', spaceMix: 0.7, tuning: 'lydian', chord: [-12, 0, 7, 11, 16, 18],
         pad: { timbre: 'choir', level: 0.3 }, handpan: 0.5, wash: 0.45, bells: 0.35, kalimba: 0.15,
         rhythm: 'heartGroove', tempo: 64, rhythmLevel: 0.42, motion: 'orbit', binaural: 10,
-        events: [{ t: 0, type: 'koshi' }, { t: 22, type: 'chimesOrbit' }, { t: 200, type: 'chimesOrbit' }, { t: 300, type: 'gong' }, { t: 304, type: 'shimmer' }],
+        events: [{ t: 0, type: 'koshi' }, { t: 22, type: 'chimesOrbit' }, { t: 120, type: 'belltree' }, { t: 200, type: 'chimesOrbit' }, { t: 300, type: 'gong' }, { t: 304, type: 'shimmer' }],
         cue: 'Сердце раскрывается. Представьте тёплый свет в центре груди — с каждым вдохом его больше. Звук кружит вокруг вас — это любовь, которая уже рядом. Позвольте себе её принять. Можно улыбнуться.',
       },
       {
@@ -151,7 +151,7 @@ export const SETS = [
         space: 'infinity', spaceMix: 0.8, tuning: 'sabye', root: 5, chord: [-12, 0, 7, 12, 14, 19],
         pad: { timbre: 'glass', level: 0.32 }, handpan: 0.12, wash: 0.5, bells: 0.1,
         nature: { waves: 0.45 }, rhythm: null, breath: 5, motion: 'float', binaural: 5, transition: 18,
-        events: [{ t: 2, type: 'oceanDrum' }, { t: 190, type: 'bowl' }, { t: 300, type: 'oceanDrum' }],
+        events: [{ t: 2, type: 'oceanDrum' }, { t: 100, type: 'monochord' }, { t: 190, type: 'bowl' }, { t: 250, type: 'crystal' }, { t: 300, type: 'oceanDrum' }],
         cue: 'Растворитесь. Любовь как океан: в ней нет границы между вами и миром. Ничего не нужно делать — просто будьте. Дайте звуку говорить, сделайте длинную паузу.',
       },
       {
@@ -168,7 +168,7 @@ export const SETS = [
         space: 'temple', spaceMix: 0.55, tuning: 'astra', chord: [-12, 0, 7, 12],
         pad: { timbre: 'warm', level: 0.25 }, tanpura: 0.2, handpan: 0.1, bells: 0.15,
         birds: 0.4, species: ['robin', 'dove', 'distant'], rhythm: null, binaural: 10, transition: 10,
-        events: [{ t: 2, type: 'bowl' }, { t: 16, type: 'bowl' }, { t: 30, type: 'bowl' }, { t: 62, type: 'koshi' }],
+        events: [{ t: 2, type: 'bowl' }, { t: 16, type: 'bowl' }, { t: 30, type: 'bowl' }, { t: 62, type: 'koshi' }, { t: 85, type: 'templeBell' }],
         cue: 'Возвращаемся. Пошевелите пальцами, сделайте глубокий вдох. Три удара чаши. Сохраните это тепло в сердце. Когда будете готовы — откройте глаза.',
       },
     ],
@@ -200,7 +200,7 @@ export function makeFreeSet(rng) {
       nature: { wind: outdoor ? rng.range(0.1, 0.35) : 0, leaves: outdoor ? rng.range(0, 0.25) : 0, stream: rng.chance(0.35) ? rng.range(0.15, 0.4) : 0, waves: rng.chance(0.2) ? 0.35 : 0, rain: rng.chance(0.15) ? 0.15 : 0, crickets: rng.chance(0.15) ? 0.3 : 0, fire: rng.chance(0.1) ? 0.3 : 0 },
       rhythm: rng.chance(0.3) ? rng.pick(['heartbeat', 'pulse', 'cradle', 'heartwalk']) : null, tempo: rng.int(54, 72), rhythmLevel: 0.4,
       motion: rng.pick(['still', 'still', 'orbit', 'float']), binaural: rng.pick([6, 8, 10]), breath: rng.chance(0.2) ? 5.5 : 0, transition: 20,
-      events: [{ t: 1, type: rng.pick(['bowl', 'koshi', 'tingsha', 'shimmer', 'rainstick']) }],
+      events: [{ t: 1, type: rng.pick(['bowl', 'koshi', 'tingsha', 'shimmer', 'rainstick', 'crystal', 'monochord', 'chimes']) }, { t: rng.int(90, 180), type: rng.pick(['crystal', 'fork', 'monochord', 'overtone', 'templeBell', 'belltree']) }],
       cue: 'Свободная атмосфера. Ведите голосом, добавляйте звуки вживую — пространство само медленно меняется.',
       script: [[6, rng.pick(FREE_LINES)], [rng.int(70, 110), rng.pick(FREE_LINES)], [rng.int(150, 190), rng.pick(FREE_LINES)]],
     });

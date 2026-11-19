@@ -53,7 +53,7 @@ export class HandpanSamples {
     // мягкий удар — темнее и круглее, сильный — ярче
     lp.frequency.value = bowed ? 2600 + bright * 2500 : 1600 + 14000 * Math.pow(vel, 1.6) * (0.6 + bright * 0.6);
     const g = ctx.createGain();
-    const amp = 0.95 * Math.pow(vel, 1.3);
+    const amp = 1.35 * Math.pow(vel, 1.2);
     const dur = b.duration / rate;
     if (bowed) {
       g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(amp * 0.8, t + 1.4);

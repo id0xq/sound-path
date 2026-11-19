@@ -6,6 +6,8 @@ import { TUNINGS } from './theory.js';
 import { LIVE } from './live.js';
 import { Sphere, KIND_COLORS } from './sphere.js';
 import { fmtTime, noteName, tuning as A4, clamp } from './util.js';
+import { Breathwork, PROGRAMS } from './breath.js';
+import { Builder } from './builder.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -40,7 +42,8 @@ function boot() {
   const C = app.conductor, E = app.E;
   sphere = new Sphere($('#dome'), app);
   buildSpaces(); buildSets(); buildPads(); buildHang(); bindHang(); buildMixer(); bindVoice(); bindRecorder(); bindSettings(); bindPlacement(); bindKeys();
-  bindLines(); bindNarrator(); bindHead(); bindViz();
+  app.breathwork = new Breathwork(app);
+  bindLines(); bindNarrator(); bindHead(); bindViz(); bindTabs(); bindBreath(); bindBuilder();
 
   C.on('load', renderSet);
   C.on('chapter', ({ idx, ch }) => {
@@ -100,7 +103,7 @@ function buildSets() {
   $('#guidedBtn').addEventListener('click', () => startSet(true));
   $('#holdBtn').addEventListener('click', () => app.conductor.hold());
   $('#stopBtn').addEventListener('click', () => {
-    app.conductor.stop(); app.narrator.stop();
+    app.conductor.stop(); app.narrator.stop(); if (app.breathwork.active) app.breathwork.stop(true);
     if (app.recorder.active && recWithSet) setTimeout(() => stopRecording(), 6500);
     releaseWake();
   });
@@ -151,7 +154,7 @@ function syncTransport() {
   const C = app.conductor;
   $('#playBtn').disabled = C.running; $('#guidedBtn').disabled = C.running;
   $('#guidedBtn').textContent = C.running ? (app.narrator.on ? 'Ведущий ведёт медитацию' : 'Сет идёт') : C.elapsed > 0 ? 'Медитация с голосом с этой главы' : 'Медитация с голосом';
-  $('#playBtn').textContent = C.elapsed > 0 && !C.running ? 'Вести самому с этой главы' : 'Вести самому';
+  $('#playBtn').textContent = C.running ? 'Сет идёт' : C.elapsed > 0 ? 'Начать с этой главы' : 'Начать сет';
   $('#holdBtn').disabled = !C.running; $('#stopBtn').disabled = !C.running;
   $('#holdBtn').setAttribute('aria-pressed', String(C.held)); $('#holdBtn').textContent = C.held ? 'Продолжить сюжет' : 'Задержать главу';
 }
@@ -241,8 +244,8 @@ function bindHang() {
 
 // ---------- Пэды ----------
 function buildPads() {
-  const box = $('#pads'); box.innerHTML = '';
-  for (const p of LIVE) box.appendChild(padBtn(p.id, p.name, p.key, KIND_COLORS[p.kind]));
+  const box = $('#pads'); box.innerHTML = ''; const heal = $('#padsHeal'); heal.innerHTML = '';
+  for (const p of LIVE) (p.heal ? heal : box).appendChild(padBtn(p.id, p.name, p.key, KIND_COLORS[p.kind]));
   for (const s of app.live.samples) box.appendChild(padBtn(s.id, s.name, s.loop ? 'петля' : 'свой звук', '#ffffff'));
   const sel = $('#liveTuning');
   if (sel.options.length < 2) for (const [k, t] of Object.entries(TUNINGS)) { const o = document.createElement('option'); o.value = k; o.textContent = t.name; sel.appendChild(o); }
@@ -411,6 +414,8 @@ function bindSettings() {
   const a4 = store.get('a4', 440); A4.a4 = a4; $$('#a4 button').forEach((x) => x.setAttribute('aria-checked', String(Number(x.dataset.a4) === a4)));
   $('#hrtf').addEventListener('change', (e) => { E.hrtf = e.target.checked; });
   $('#dissolveBtn').addEventListener('click', () => E.dissolve(10));
+  $('#fast').checked = store.get('fast', false);
+  $('#fast').addEventListener('change', (e) => { store.set('fast', e.target.checked); $('#fastNote').hidden = false; });
   $('#binauralOn').addEventListener('change', (e) => { app.binaural.enabled = e.target.checked; app.binaural.apply(0.5); });
   $('#wake').addEventListener('change', (e) => { if (!e.target.checked) releaseWake(); else if (app.conductor.running) requestWake(); });
 }
@@ -535,4 +540,93 @@ function bindViz() {
   const set = (m) => { sphere.setMode(m); $$('#vizModes button').forEach((x) => x.setAttribute('aria-checked', String(x.dataset.viz === m))); store.set('viz', m); };
   $$('#vizModes button').forEach((b) => b.addEventListener('click', () => set(b.dataset.viz)));
   set(saved);
+}
+
+// ---------- Вкладки «Сеты / Дыхание» ----------
+function bindTabs() {
+  $$('#modeTabs button').forEach((b) => b.addEventListener('click', () => {
+    $$('#modeTabs button').forEach((x) => { const on = x === b; x.setAttribute('aria-checked', String(on)); x.setAttribute('aria-selected', String(on)); });
+    $('#tabSets').hidden = b.dataset.tab !== 'sets'; $('#tabBreath').hidden = b.dataset.tab !== 'breath';
+  }));
+}
+
+// ---------- Дыхательные практики ----------
+let breathId = 'coherence', vizBefore = 'dome';
+function bindBreath() {
+  const B = app.breathwork, list = $('#breathList');
+  const render = () => {
+    list.innerHTML = '';
+    PROGRAMS.forEach((P) => {
+      const b = document.createElement('button');
+      b.className = 'breath-opt'; b.setAttribute('role', 'radio'); b.setAttribute('aria-checked', String(P.id === breathId));
+      b.innerHTML = '<span class="t"></span><span class="m"></span><span class="s"></span>';
+      b.querySelector('.t').textContent = P.name; b.querySelector('.m').textContent = P.rhythm; b.querySelector('.s').textContent = P.goal;
+      b.addEventListener('click', () => { breathId = P.id; render(); });
+      list.appendChild(b);
+    });
+    const P = PROGRAMS.find((p) => p.id === breathId), box = $('#breathDetail');
+    box.innerHTML = '';
+    const pa = document.createElement('p'); pa.textContent = P.about; box.appendChild(pa);
+    if (P.intense) {
+      const w = document.createElement('p'); w.className = 'warn';
+      w.textContent = 'Интенсивная практика: только сидя или лёжа, никогда в воде и за рулём. Не подходит при беременности, эпилепсии, болезнях сердца и высоком давлении. Если кружится голова, дышите спокойно.';
+      box.appendChild(w);
+    }
+    $('#breathLenRow').hidden = !!P.rounds;
+    if (!P.rounds) { $('#breathLen').value = P.minutes; $('#breathLenOut').value = P.minutes; }
+  };
+  render();
+  $('#breathLen').addEventListener('input', (e) => { $('#breathLenOut').value = e.target.value; });
+  $('#breathTempo').addEventListener('input', (e) => { $('#breathTempoOut').value = Math.round(e.target.value * 100) + '%'; });
+  $('#bwStart').addEventListener('click', async () => {
+    await app.E.ctx.resume();
+    B.opts = { beat: $('#bwBeat').checked, ticks: $('#bwTicks').checked, voice: $('#bwVoice').checked, tempo: Number($('#breathTempo').value) };
+    vizBefore = sphere.mode === 'breath' ? vizBefore : sphere.mode;
+    B.start(breathId, { minutes: Number($('#breathLen').value) });
+    sphere.setMode('breath');
+    if (recWithSet && !app.recorder.active) startRecording();
+    requestWake();
+  });
+  $('#bwStop').addEventListener('click', () => B.stop());
+  app.conductor.on('load', (set) => { if (B.active && !String(set.id).startsWith('breath-')) B.stop(true); });
+  $('#bwRelease').addEventListener('click', () => B.release());
+  B.on('start', (P) => {
+    $('#bwStart').disabled = true; $('#bwStop').disabled = false;
+    $('#cueTitle').textContent = P.name; $('#cueText').textContent = P.about; $('#cuePrev').textContent = P.rhythm; $('#cueCount').textContent = '';
+    document.documentElement.style.setProperty('--chapter', P.color); sphere.tint = P.color;
+  });
+  B.on('stop', () => {
+    $('#bwStart').disabled = false; $('#bwStop').disabled = true; $('#bwRelease').hidden = true;
+    sphere.setMode(vizBefore || 'dome');
+    $('#cueNext').textContent = 'Практика завершена.';
+    // вернуть выбранный сет, чтобы вкладка «Сеты» была готова
+    setTimeout(() => { if (!app.breathwork.active && !app.conductor.running) app.conductor.load(setId, Number($('#seed').value) || 1); }, 1800);
+    if (app.recorder.active && recWithSet) setTimeout(() => stopRecording(), 6500);
+    releaseWake();
+  });
+  setInterval(() => {
+    const st = B.state(app.E.now);
+    $('#bwRelease').hidden = !(st && st.open);
+    if (st && st.label) $('#cueNext').textContent = st.open ? 'Держите, сколько комфортно. Нажмите «Вдохнуть», когда захочется.' : `Сейчас: ${st.label.toLowerCase()}`;
+  }, 200);
+}
+
+// ---------- Конструктор сцены ----------
+function bindBuilder() {
+  const root = $('#builder'), B = new Builder(app, root);
+  app.builder = B;
+  const open = () => { root.hidden = false; $('#builderBtn').setAttribute('aria-expanded', 'true'); if (app.conductor.running) B.fromCurrent(); else B.render(); };
+  const close = () => { root.hidden = true; $('#builderBtn').setAttribute('aria-expanded', 'false'); };
+  $('#builderBtn').addEventListener('click', () => (root.hidden ? open() : close()));
+  root.querySelector('[data-close-builder]').addEventListener('click', close);
+  root.addEventListener('click', (e) => { if (e.target === root) close(); });
+  window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !root.hidden) close(); });
+  $('#bName').addEventListener('input', (e) => { B.name = e.target.value || 'Моя сцена'; });
+  $('#bLive').addEventListener('change', (e) => { B.live = e.target.checked; });
+  $('#bTake').addEventListener('click', () => B.fromCurrent());
+  $('#bNew').addEventListener('click', () => { B.scene = B.fresh(); B.blocks = ['pad', 'wash', 'handpan', 'bells']; B.name = 'Моя сцена'; B.render(); B.changed(); });
+  $('#bApply').addEventListener('click', async () => { await app.E.ctx.resume(); B.apply(); });
+  $('#bSave').addEventListener('click', () => B.save());
+  $('#bAddSet').addEventListener('click', () => B.addToSet(Math.max(1, Number($('#bMinutes').value) || 5)));
+  $('#bRunSet').addEventListener('click', async () => { await app.E.ctx.resume(); B.runSet(); close(); });
 }

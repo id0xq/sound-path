@@ -20,6 +20,15 @@ export const LIVE = [
   { id: 'bird', name: 'Птица', key: '=', kind: 'bird' },
   { id: 'shimmer', name: 'Луч', key: 'b', kind: 'wash' },
   { id: 'flyby', name: 'Стайка', key: 'n', kind: 'bird' },
+  { id: 'crystal', name: 'Хрустальная чаша', key: 'z', kind: 'wash', heal: true },
+  { id: 'fork', name: 'Камертон «Ом»', key: 'x', kind: 'bells', heal: true },
+  { id: 'monochord', name: 'Монохорд', key: 'c', kind: 'wash', heal: true },
+  { id: 'shruti', name: 'Шрути', key: 'v', kind: 'wash', heal: true },
+  { id: 'templeBell', name: 'Храмовый колокол', key: 'm', kind: 'gong', heal: true },
+  { id: 'chimes', name: 'Ветряные колокольчики', key: ',', kind: 'bells', heal: true },
+  { id: 'belltree', name: 'Дерево колокольчиков', key: '.', kind: 'bells', heal: true },
+  { id: 'overtone', name: 'Обертоновое пение', key: '/', kind: 'wash', heal: true },
+  { id: 'dissolve', name: 'Растворение', key: 'p', kind: 'wash', heal: true },
 ];
 
 export class Live {
@@ -68,9 +77,9 @@ export class Live {
     const m = notes[Math.min(index, notes.length - 1)];
     const t = E.now + 0.005;
     if (!this.hpEm || this.mode !== this._hpMode || (this.mode === 'point' && this._hpPoint !== this.point) || this.mode === 'orbit') {
-      const p = this.mode === 'around' ? { pos: polar(0, -6, 2.2) } : this.place(6, {});
+      const p = this.mode === 'around' ? { pos: polar(0, -8, 1.6) } : this.place(6, {});
       if (this.hpEm && !this.hpEm._oneshot) { const old = this.hpEm; E.after(E.now + 7, () => old.dispose()); }
-      this.hpEm = E.spawn({ group: 'live', pos: p.pos, send: 0.38, kind: 'handpan', label: 'ханг' });
+      this.hpEm = E.spawn({ group: 'live', pos: p.pos, send: 0.25, kind: 'handpan', label: 'ханг' });
       if (p.path) this.hpEm.path(p.path);
       this._hpMode = this.mode; this._hpPoint = this.point;
     }
@@ -124,6 +133,19 @@ export class Live {
         const em = this.voice('wash', 'луч', 18, 0.8, { high: true }); I.shimmer(E, em.input, t, { freqs: fr, dur: 9 }); break;
       }
       case 'flyby': this.app.birds.flyby(t); break;
+      case 'crystal': { const em = this.voice('wash', 'хрустальная чаша', 28, 0.5, { front: true }); I.crystalBowl(E, em.input, t, { freq: mtof(ding + 12), hold: 9 }); break; }
+      case 'fork': { const em = this.voice('bells', 'камертон', 22, 0.3, { front: true }); I.tuningFork(E, em.input, t, { freq: 136.1 }); break; }
+      case 'monochord': { const em = this.voice('wash', 'монохорд', 14, 0.5); I.monochord(E, em.input, t, { freq: mtof(ding - 12), strokes: 3 }); break; }
+      case 'shruti': { const em = this.voice('wash', 'шрути', 18, 0.45, { front: true }); I.shruti(E, em.input, t, { freq: mtof(ding - 12), dur: 14 }); break; }
+      case 'templeBell': { const em = this.voice('gong', 'храмовый колокол', 20, 0.5); I.templeBell(E, em.input, t, { freq: mtof(ding) * 0.75 }); break; }
+      case 'chimes': { const em = this.voice('bells', 'ветряные колокольчики', 10, 0.5, { high: true }); I.windChimes(E, em.input, t, { freqs: this.pentatonic(24, 36).map(mtof), dur: 6 }); break; }
+      case 'belltree': {
+        const em = E.spawn({ group: 'live', pos: polar(-60, 55, 2.4), send: 0.5, kind: 'bells', label: 'дерево колокольчиков', life: t + 7 });
+        em.path([{ t, pos: polar(-60, 60, 2.4) }, { t: t + 2, pos: polar(60, 10, 2.4) }]);
+        I.bellTree(E, em.input, t, { base: mtof(ding + 36) }); break;
+      }
+      case 'overtone': { const em = this.voice('wash', 'обертоны', 16, 0.45, { front: true }); I.overtone(E, em.input, t, { freq: mtof(ding - 12), dur: 12 }); break; }
+      case 'dissolve': E.dissolve(10); break;
       default: {
         const s = this.samples.find((x) => x.id === id); if (s) this.playSample(s);
       }

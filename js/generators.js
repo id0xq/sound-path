@@ -14,6 +14,7 @@ import { scaleInRange } from './theory.js';
 export const EVENT_NAMES = {
   bowl: 'Чаша', bowlSing: 'Поющая чаша', tingsha: 'Тингши', koshi: 'Колокольчики', gong: 'Гонг', rainstick: 'Дождевая палка',
   chimesOrbit: 'Хоровод колокольчиков', shimmer: 'Луч', flyby: 'Стайка птиц', oceanDrum: 'Океанский барабан', dissolve: 'Растворение',
+  crystal: 'Хрустальная чаша', fork: 'Камертон «Ом»', monochord: 'Монохорд', templeBell: 'Храмовый колокол', chimes: 'Ветряные колокольчики', belltree: 'Дерево колокольчиков', overtone: 'Обертоновое пение',
 };
 
 export class Generators {
@@ -33,9 +34,9 @@ export class Generators {
     switch (S.motion) {
       case 'orbit': { const az = (this.orbitPhase + now * 9) % 360; return polar(az, high ? r.range(25, 45) : r.range(5, 20), r.range(2.6, 3.6)); }
       case 'float': return polar(r.range(-180, 180), r.range(25, 60), r.range(3, 7));
-      case 'walk': return polar(r.range(-30, 30), high ? r.range(25, 50) : r.range(0, 10), r.range(2.4, 3.8));
+      case 'walk': return polar(r.range(-30, 30), high ? r.range(25, 50) : r.range(0, 10), high ? r.range(2.4, 3.8) : r.range(1.6, 2.4));
       default:
-        if (front) return polar(r.range(-70, 70), r.range(-5, 15), r.range(2.2, 3.4));
+        if (front) return polar(r.range(-70, 70), r.range(-5, 15), r.range(1.6, 2.4));
         return polar(r.range(-140, 140), high ? r.range(25, 60) : r.range(0, 25), r.range(2.6, 5));
     }
   }
@@ -67,8 +68,8 @@ export class Generators {
     const unit = withRhythm ? rh.beatDur() / 2 : r.range(0.32, 0.55);
     // фразы приходят то слева, то справа и медленно плывут по дуге
     this.hpSide = -(this.hpSide || 1);
-    const p0 = S.motion === 'still' ? polar(this.hpSide * r.range(20, 115), r.range(-5, 20), r.range(2, 3.4)) : this.pos(S, now, { front: true });
-    const em = E.spawn({ group: 'instr', pos: p0, send: 0.4, kind: 'handpan', label: 'ханг' });
+    const p0 = S.motion === 'still' ? polar(this.hpSide * r.range(15, 100), r.range(-8, 12), r.range(1.5, 2.3)) : this.pos(S, now, { front: true });
+    const em = E.spawn({ group: 'instr', pos: p0, send: 0.26, kind: 'handpan', label: 'ханг' });
     const phraseLen = seq.length * unit * 2.2 + 3;
     em.path(arc(p0, (S.motion === 'orbit' ? 60 : 30) * this.hpSide * -1 * r.range(0.6, 1.3), t, t + phraseLen, r.range(-5, 10)));
     let end = t;
@@ -101,13 +102,31 @@ export class Generators {
   // ---------- Колокольчики коши над головой ----------
   bells(now, S, d) {
     const r = this.rng, E = this.E, C = this.C;
-    const pool = scaleInRange(S.tuning, C.ding, C.ding + 34, C.ding + 46, { pentatonic: true }).map(mtof);
-    const t = now + 0.1, pos = this.pos(S, now, { high: true });
+    // Колокольчики отвечают хангу: звучат в его паузах, на долю ритма и нотами аккорда — без спора с хангом
+    const pool = this.bellPool(S).map(mtof);
+    const rh = this.app.rhythm;
+    let t = Math.max(now + 0.1, this.busyUntil.handpan + r.range(0.3, 0.9));
+    if (rh.active) t = rh.nextBeat(t);
+    if (t > now + 6) { this.next.bells = now + 2; return; }
+    const beat = rh.active ? rh.beatDur() : r.range(0.5, 0.75);
+    const pos = this.pos(S, now, { high: true });
     const em = E.spawn({ group: 'instr', pos, send: 0.55, kind: 'bells', label: 'колокольчики' });
-    const end = I.koshiStrum(E, em.input, t, { freqs: pool, count: r.int(3, 8), spread: r.range(0.8, 2.5), vel: 0.5 });
+    let end = t; const count = r.int(3, 6); let tt = t;
+    for (let k = 0; k < count; k++) {
+      end = Math.max(end, I.koshi(E, em.input, tt, { freq: r.pick(pool), vel: (0.42 - k * 0.04) * r.range(0.85, 1.1) }));
+      tt += beat * r.pick([0.25, 0.5, 0.5, 0.75]);
+    }
     em.path(arc(pos, r.sign() * r.range(60, 140), t, t + 4, r.range(-10, 10)));
     em.end = end; em.glow = 0.8; E.after(end, () => em.dispose());
     this.next.bells = now + r.range(0.6, 1.5) * (5 + (1 - d) * 28);
+  }
+
+  // ноты колокольчиков: тоны текущего аккорда в высоком регистре (+ немного пентатоники)
+  bellPool(S) {
+    const C = this.C, pcs = new Set((S.chord || [0, 7, 12]).map((i) => (((i % 12) + 12) % 12)));
+    const all = scaleInRange(S.tuning, C.ding, C.ding + 34, C.ding + 46, { pentatonic: true });
+    const chord = all.filter((m) => pcs.has((((m - C.ding) % 12) + 12) % 12));
+    return chord.length >= 3 ? chord.concat(chord, all) : all;
   }
 
   // ---------- Окарина: зов издалека и отклик с другой стороны ----------
@@ -204,6 +223,13 @@ export class Generators {
       }
       case 'flyby': this.app.birds.flyby(t); return null;
       case 'dissolve': setTimeout(() => E.dissolve(10), Math.max(0, (t - E.now) * 1000)); return null;
+      case 'crystal': return one(polar(r.range(-40, 40), 10, 2.4), 'wash', 'хрустальная чаша', 0.5, (d) => I.crystalBowl(E, d, t, { freq: mtof(C.ding + 12), hold: 10 }));
+      case 'fork': return one(polar(0, 0, 1.8), 'bells', 'камертон', 0.3, (d) => I.tuningFork(E, d, t, { freq: 136.1 }));
+      case 'monochord': return one(polar(r.range(-90, 90), 0, 2.6), 'wash', 'монохорд', 0.5, (d) => I.monochord(E, d, t, { freq: mtof(C.ding - 12), strokes: 3 }));
+      case 'templeBell': return one(polar(r.range(-120, 120), 5, 6), 'gong', 'храмовый колокол', 0.6, (d) => I.templeBell(E, d, t, { freq: mtof(C.ding) * 0.75 }));
+      case 'chimes': return one(polar(r.range(-150, 150), 40, 3), 'bells', 'ветряные колокольчики', 0.5, (d) => I.windChimes(E, d, t, { freqs: scaleInRange(S.tuning, C.ding, C.ding + 24, C.ding + 36, { pentatonic: true }).map(mtof), dur: 6 }));
+      case 'belltree': return one(polar(0, 60, 2.4), 'bells', 'дерево колокольчиков', 0.5, (d) => I.bellTree(E, d, t, { base: mtof(C.ding + 36) }));
+      case 'overtone': return one(polar(0, -5, 2), 'wash', 'обертоны', 0.45, (d) => I.overtone(E, d, t, { freq: mtof(C.ding - 12), dur: 12 }));
     }
     return null;
   }

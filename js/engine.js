@@ -30,7 +30,9 @@ export class Engine {
   async init() {
     setAudioSession('playback'); // iPhone: иначе беззвучный режим глушит веб-звук
     const AC = window.AudioContext || window.webkitAudioContext;
-    const ctx = (this.ctx = new AC({ latencyHint: 'interactive' }));
+    let hint = 'playback';
+    try { if (localStorage.getItem('zp:fast') === 'true') hint = 'interactive'; } catch (e) {}
+    const ctx = (this.ctx = new AC({ latencyHint: hint }));
     const L = ctx.listener;
     if (L.forwardX) {
       L.forwardX.value = 0; L.forwardY.value = 0; L.forwardZ.value = -1;
@@ -108,7 +110,7 @@ export class Engine {
     const split = ctx.createChannelSplitter(2);
     this.recTap.connect(split);
     this.anL = ctx.createAnalyser(); this.anR = ctx.createAnalyser();
-    [this.anL, this.anR].forEach((a) => { a.fftSize = 2048; a.smoothingTimeConstant = 0.75; });
+    [this.anL, this.anR].forEach((a) => { a.fftSize = 8192; a.smoothingTimeConstant = 0.75; });
     split.connect(this.anL, 0); split.connect(this.anR, 1);
 
     for (const name of ['atmos', 'nature', 'birds', 'instr', 'rhythm', 'live', 'resonance', 'narrator']) this.createGroup(name);
@@ -207,15 +209,18 @@ export class Engine {
     const f = [Math.sin(y) * Math.cos(p), Math.sin(p), -Math.cos(y) * Math.cos(p)];
     const u = [-Math.sin(y) * Math.sin(p), Math.cos(p), Math.cos(y) * Math.sin(p)];
     if (L.forwardX) {
-      L.forwardX.setTargetAtTime(f[0], t, 0.025); L.forwardY.setTargetAtTime(f[1], t, 0.025); L.forwardZ.setTargetAtTime(f[2], t, 0.025);
-      L.upX.setTargetAtTime(u[0], t, 0.025); L.upY.setTargetAtTime(u[1], t, 0.025); L.upZ.setTargetAtTime(u[2], t, 0.025);
+      L.forwardX.value = f[0]; L.forwardY.value = f[1]; L.forwardZ.value = f[2];
+      L.upX.value = u[0]; L.upY.value = u[1]; L.upZ.value = u[2];
     } else L.setOrientation(f[0], f[1], f[2], u[0], u[1], u[2]);
     // подсказки «сзади / сверху» пересчитываем относительно головы
     if (Math.abs(yaw - (this._cueYaw || 0)) > 6 || Math.abs(pitch - (this._cuePitch || 0)) > 6) {
       this._cueYaw = yaw; this._cuePitch = pitch;
-      for (const v of this.viz.values()) if (v.updateCue) v.updateCue(t);
+      for (const v of this.viz.values()) if (v.updateCue) v.updateCue();
     }
   }
+
+  // Моторный цикл: двигает все источники по их путям
+  motion(now = this.now) { for (const v of this.viz.values()) if (v.step) v.step(now); }
 
   duck(amount, depthDb = 7, speaking = false) {
     const t = this.now, tau = speaking ? 0.06 : 0.45;
@@ -241,7 +246,9 @@ export class Engine {
 }
 
 // ---------- Источник в 3D ----------
-// Цепочка: воздух (даль темнее) → подсказки направления (сзади темнее, сверху «воздушнее») → HRTF
+// Цепочка: воздух (даль темнее) → подсказки направления (сзади темнее, сверху «воздушнее») → HRTF.
+// Важно для плавности: позиции и фильтры меняются не автоматизацией (она заставляет браузер считать
+// панораму на каждом сэмпле), а редкими точными шагами из общего «моторного» цикла — 25 раз в секунду.
 class Emitter {
   constructor(E, { group, pos, send, atmos, kind, label, hrtf }) {
     const ctx = E.ctx; this.E = E;
@@ -259,68 +266,69 @@ class Emitter {
     this.panner.connect(this.dryG); this.dryG.connect(g.dry);
     this.panner.connect(this.sendG); this.sendG.connect(g.send);
     this.panner.connect(this.atmG); this.atmG.connect(g.atmos);
-    this.kf = [];
+    this.kf = []; this.applied = null; this.lastCue = -1;
     this.id = vizId++; this.kind = kind; this.label = label; this.born = E.now; this.end = Infinity;
     this.glow = 0; this.lastHit = -10; this.hitEnd = -10;
     this.setPos(pos || { x: 0, y: 0, z: -2 }, 0);
     E.viz.set(this.id, this);
   }
-  _applyDistance(p, t, tau) {
-    const { d } = toPolar(p);
-    const fc = clamp(19000 / (1 + d / 7), 2400, 19000);
-    // ближние звуки — сухие и чёткие, дальние — тонут в пространстве
-    const near = clamp((d - 1.2) / 14, 0, 1.4);
-    const send = this.baseSend * (0.35 + 0.65 * near);
-    const atm = this.baseAtmos * (0.5 + 0.5 * near);
-    const set = (param, v) => (tau > 0 ? param.setTargetAtTime(v, t, tau) : param.setValueAtTime(v, t));
-    set(this.air.frequency, fc); set(this.sendG.gain, send); set(this.atmG.gain, atm);
-    this._applyCue(p, t, tau);
+  // мгновенно поставить в точку
+  _apply(p, force = false) {
+    const a = this.applied;
+    if (!force && a && Math.abs(a.x - p.x) + Math.abs(a.y - p.y) + Math.abs(a.z - p.z) < 0.015) return;
+    const P = this.panner;
+    if (P.positionX) { P.positionX.value = p.x; P.positionY.value = p.y; P.positionZ.value = p.z; }
+    else P.setPosition(p.x, p.y, p.z);
+    this.applied = p;
+    const now = this.E.now;
+    if (force || now - this.lastCue > 0.09) { this.lastCue = now; this._applyDistance(p); }
   }
-  // Подсказки направления относительно головы (с учётом поворота)
-  _applyCue(p, t, tau) {
+  _applyDistance(p) {
+    const { d } = toPolar(p);
+    const near = clamp((d - 1.2) / 14, 0, 1.4);
+    this.air.frequency.value = clamp(19000 / (1 + d / 7), 2400, 19000);
+    this.sendG.gain.value = this.baseSend * (0.35 + 0.65 * near);   // ближние — сухие и чёткие
+    this.atmG.gain.value = this.baseAtmos * (0.5 + 0.5 * near);      // дальние — тонут в пространстве
+    this._applyCue(p);
+  }
+  _applyCue(p) {
     const { az, el } = toPolar(p);
     let rel = az - this.E.head.yaw; rel = ((rel + 540) % 360) - 180;
     const back = clamp((Math.abs(rel) - 95) / 70, 0, 1);
     const relEl = el - this.E.head.pitch;
-    const up = relEl > 0 ? clamp(relEl / 55, 0, 1) * 4.5 : -clamp(-relEl / 35, 0, 1) * 3;
-    const set = (param, v) => (tau > 0 ? param.setTargetAtTime(v, t, tau) : param.setValueAtTime(v, t));
-    set(this.rear.gain, -6 * back); set(this.elev.gain, up);
+    this.rear.gain.value = -6 * back;
+    this.elev.gain.value = relEl > 0 ? clamp(relEl / 55, 0, 1) * 4.5 : -clamp(-relEl / 35, 0, 1) * 3;
   }
-  updateCue(t) { const p = this.posAt(t); if (p) this._applyCue(p, t, 0.08); }
+  updateCue() { if (this.applied) this._applyCue(this.applied); }
+  // Переместить: glide — секунды плавного перехода
   setPos(p, glide = 0, t = this.E.now) {
-    const P = this.panner;
     p = soften(p);
-    if (P.positionX) {
-      if (glide > 0) { P.positionX.setTargetAtTime(p.x, t, glide / 3); P.positionY.setTargetAtTime(p.y, t, glide / 3); P.positionZ.setTargetAtTime(p.z, t, glide / 3); }
-      else { P.positionX.setValueAtTime(p.x, t); P.positionY.setValueAtTime(p.y, t); P.positionZ.setValueAtTime(p.z, t); }
-    } else P.setPosition(p.x, p.y, p.z);
-    this._applyDistance(p, t, glide / 3);
-    const from = this.posAt(t);
-    this.kf = [{ t, pos: from || p }, { t: t + Math.max(glide, 0.001), pos: p }];
+    if (glide <= 0.001) { this.kf = []; this.pos = p; this._apply(p, true); return; }
+    const from = this.posAt(t) || p;
+    this.kf = [{ t, pos: from }, { t: t + glide, pos: p }];
     this.pos = p;
   }
-  // Путь по ключевым точкам [{t, pos}]: позиция и подсказки направления меняются вдоль пути
+  // Путь по ключевым точкам [{t, pos}]
   path(points) {
-    const P = this.panner; if (!points.length) return;
-    const pts = points.map((k) => ({ t: k.t, pos: soften(k.pos) }));
-    if (P.positionX) {
-      const f = pts[0];
-      P.positionX.setValueAtTime(f.pos.x, f.t); P.positionY.setValueAtTime(f.pos.y, f.t); P.positionZ.setValueAtTime(f.pos.z, f.t);
-      for (let i = 1; i < pts.length; i++) {
-        const k = pts[i];
-        P.positionX.linearRampToValueAtTime(k.pos.x, k.t); P.positionY.linearRampToValueAtTime(k.pos.y, k.t); P.positionZ.linearRampToValueAtTime(k.pos.z, k.t);
-      }
-    } else P.setPosition(pts[0].pos.x, pts[0].pos.y, pts[0].pos.z);
-    this._applyDistance(pts[0].pos, pts[0].t, 0);
-    for (let i = 1; i < pts.length; i++) this._applyCue(pts[i].pos, pts[i - 1].t, Math.max(0.05, (pts[i].t - pts[i - 1].t) / 3));
-    this.kf = pts; this.pos = pts[pts.length - 1].pos;
+    if (!points.length) return;
+    this.kf = points.map((k) => ({ t: k.t, pos: soften(k.pos) }));
+    this.pos = this.kf[this.kf.length - 1].pos;
+    this._apply(this.kf[0].pos, true);
+  }
+  // Шаг движения (вызывается движком ~25 раз в секунду)
+  step(now) {
+    const k = this.kf; if (!k.length) return;
+    if (now > k[k.length - 1].t + 0.1) { this._apply(k[k.length - 1].pos, true); this.kf = []; return; }
+    if (now < k[0].t) return;
+    this._apply(this.posAt(now));
   }
   posAt(time) {
     const k = this.kf; if (!k.length) return this.pos;
     if (time <= k[0].t) return k[0].pos;
     for (let i = 1; i < k.length; i++) {
       if (time <= k[i].t) {
-        const a = k[i - 1], b = k[i], u = (time - a.t) / Math.max(1e-6, b.t - a.t);
+        const a = k[i - 1], b = k[i]; let u = (time - a.t) / Math.max(1e-6, b.t - a.t);
+        if (k.length === 2) u = u * u * (3 - 2 * u); // мягкий разгон и торможение
         return { x: a.pos.x + (b.pos.x - a.pos.x) * u, y: a.pos.y + (b.pos.y - a.pos.y) * u, z: a.pos.z + (b.pos.z - a.pos.z) * u };
       }
     }

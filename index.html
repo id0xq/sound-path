@@ -42,7 +42,8 @@
     <div class="spaces" id="spaces" role="radiogroup" aria-label="Пространство"></div>
     <div class="top-tools">
       <label class="hp">Наушники <input type="range" id="hpVol" min="0" max="1.3" step="0.01" value="0.9"></label>
-      <button class="btn ghost" id="narratorBtn" aria-expanded="false" aria-controls="narratorPanel">Ведущий</button>
+      <button class="btn ghost" id="builderBtn" aria-expanded="false" aria-controls="builder">Конструктор</button>
+      <button class="btn ghost" id="narratorBtn" aria-expanded="false" aria-controls="narratorPanel" hidden>Ведущий</button>
       <button class="btn ghost" id="mixerBtn" aria-expanded="false" aria-controls="mixer">Микшер</button>
       <button class="btn ghost" id="settingsBtn" aria-expanded="false" aria-controls="settings">Настройки</button>
     </div>
@@ -50,10 +51,15 @@
 
   <main class="layout">
     <section class="set-panel glass" aria-label="Сет">
+      <div class="seg tabs" id="modeTabs" role="tablist" aria-label="Режим">
+        <button role="tab" data-tab="sets" aria-checked="true" aria-selected="true">Сеты</button>
+        <button role="tab" data-tab="breath" aria-checked="false" aria-selected="false">Дыхание</button>
+      </div>
+      <div class="tab-sets" id="tabSets">
       <div class="set-picker" id="setPicker" role="radiogroup" aria-label="Выбор сета"></div>
       <div class="transport">
-        <button class="btn primary" id="guidedBtn">Медитация с голосом</button>
-        <button class="btn" id="playBtn">Вести самому</button>
+        <button class="btn primary" id="guidedBtn" hidden>Медитация с голосом</button>
+        <button class="btn primary" id="playBtn">Начать сет</button>
         <button class="btn" id="holdBtn" disabled aria-pressed="false">Задержать главу</button>
         <button class="btn" id="stopBtn" disabled>Завершить</button>
       </div>
@@ -69,6 +75,31 @@
         <button class="btn ghost small" id="dice">Новая</button>
       </div>
       <ol class="chapters" id="chapters"></ol>
+      </div>
+      <div class="tab-breath" id="tabBreath" hidden>
+        <div class="breath-list" id="breathList" role="radiogroup" aria-label="Дыхательная практика"></div>
+        <div class="breath-detail" id="breathDetail"></div>
+        <div class="row-ctl" id="breathLenRow">
+          <label for="breathLen">Минут</label>
+          <input type="range" id="breathLen" min="3" max="30" step="1" value="10">
+          <output id="breathLenOut">10</output>
+        </div>
+        <div class="row-ctl">
+          <label for="breathTempo">Темп</label>
+          <input type="range" id="breathTempo" min="0.8" max="1.2" step="0.01" value="1">
+          <output id="breathTempoOut">100%</output>
+        </div>
+        <div class="toggles">
+          <label class="tog"><input type="checkbox" id="bwBeat" checked> Бит</label>
+          <label class="tog"><input type="checkbox" id="bwTicks" checked> Счёт в задержках</label>
+          <label class="tog"><input type="checkbox" id="bwVoice"> Подсказки голосом устройства</label>
+        </div>
+        <div class="transport">
+          <button class="btn primary" id="bwStart">Начать практику</button>
+          <button class="btn" id="bwRelease" hidden>Вдохнуть</button>
+          <button class="btn" id="bwStop" disabled>Завершить</button>
+        </div>
+      </div>
     </section>
 
     <section class="stage">
@@ -95,6 +126,8 @@
             <svg viewBox="0 0 28 16" aria-hidden="true"><path d="M2 15 A12 12 0 0 1 26 15 Z" fill="none" stroke="currentColor" stroke-width="1.2"/><circle cx="12" cy="10" r=".9" fill="currentColor"/><circle cx="15" cy="8" r=".9" fill="currentColor"/><circle cx="14" cy="12" r=".9" fill="currentColor"/><circle cx="17" cy="11" r=".9" fill="currentColor"/></svg><span>Поле</span></button>
           <button data-viz="lissajous" role="radio" aria-checked="false" title="Лиссажу: форма стерео">
             <svg viewBox="0 0 28 16" aria-hidden="true"><path d="M14 1 L22 8 L14 15 L6 8 Z" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M11 8 Q14 3 17 8 Q14 13 11 8" fill="none" stroke="currentColor" stroke-width=".9"/></svg><span>Лиссажу</span></button>
+          <button data-viz="chladni" role="radio" aria-checked="false" title="Хладни: песок на звучащей пластине">
+            <svg viewBox="0 0 28 16" aria-hidden="true"><rect x="7" y="1" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.1"/><path d="M7 8 Q14 3 21 8 M7 8 Q14 13 21 8 M14 1 Q10 8 14 15" fill="none" stroke="currentColor" stroke-width=".9"/></svg><span>Хладни</span></button>
           <button data-viz="crystal" role="radio" aria-checked="false" title="Кристалл: спектр, собранный в снежинку">
             <svg viewBox="0 0 28 16" aria-hidden="true"><path d="M14 1 V15 M8 4.5 L20 11.5 M20 4.5 L8 11.5 M14 4 L12 2.5 M14 4 L16 2.5 M14 12 L12 13.5 M14 12 L16 13.5" fill="none" stroke="currentColor" stroke-width="1.1"/></svg><span>Кристалл</span></button>
         </div>
@@ -169,6 +202,8 @@
     </div>
     <div class="pads-wrap">
       <div class="pads" id="pads"></div>
+      <h4 class="pads-title">Звукотерапия</h4>
+      <div class="pads" id="padsHeal"></div>
       <div class="pads-foot">
         <label class="btn ghost small file-btn">Добавить свой звук<input type="file" id="fileIn" accept="audio/*"></label>
         <span class="keys-hint">Клавиши: A S D F G H J K L — ханг, цифры — инструменты</span>
@@ -191,6 +226,40 @@
     <p class="drawer-note">Прочитайте реплики своим голосом — потом медитацию по одной кнопке поведёте вы сами. Записи хранятся только на этом устройстве.</p>
     <ol class="own-lines" id="ownLines"></ol>
   </aside>
+
+  <section class="builder" id="builder" hidden aria-label="Конструктор сцены">
+    <div class="builder-inner glass">
+      <div class="builder-head">
+        <h3>Конструктор сцены</h3>
+        <input id="bName" aria-label="Название сцены" value="Моя сцена">
+        <label class="tog"><input type="checkbox" id="bLive" checked> Слушать сразу</label>
+        <button class="btn small" id="bTake">Взять то, что звучит</button>
+        <button class="btn small" id="bNew">Чистая сцена</button>
+        <button class="btn primary small" id="bApply">Слушать сцену</button>
+        <button class="btn ghost small" data-close-builder>Закрыть</button>
+      </div>
+      <div class="builder-body">
+        <aside class="b-palette" id="bPalette" aria-label="Блоки"></aside>
+        <div class="b-grid" id="bGrid"></div>
+      </div>
+      <div class="builder-foot">
+        <div class="b-saved-wrap">
+          <div class="b-foot-head"><h4>Мои сцены</h4><button class="btn small" id="bSave">Сохранить сцену</button></div>
+          <div class="b-saved" id="bSaved"></div>
+        </div>
+        <div class="b-set-wrap">
+          <div class="b-foot-head">
+            <h4>Мой сет</h4>
+            <label class="b-min">на <input type="number" id="bMinutes" min="1" max="60" value="5"> мин</label>
+            <button class="btn small" id="bAddSet">Добавить сцену в сет</button>
+            <button class="btn primary small" id="bRunSet">Запустить мой сет</button>
+          </div>
+          <div class="b-set" id="bSet"></div>
+          <p class="drawer-note" id="bTotal"></p>
+        </div>
+      </div>
+    </div>
+  </section>
 
   <aside class="drawer glass" id="mixer" hidden aria-label="Микшер">
     <div class="drawer-head"><h3>Микшер</h3><button class="btn ghost small" data-close>Закрыть</button></div>
@@ -215,6 +284,8 @@
       <label class="tog"><input type="checkbox" id="hrtf" checked> Объёмный звук HRTF (выключите на слабом телефоне)</label>
       <label class="tog"><input type="checkbox" id="binauralOn" checked> Бинауральный тон под атмосферой</label>
       <label class="tog"><input type="checkbox" id="wake" checked> Не гасить экран во время сета</label>
+      <label class="tog"><input type="checkbox" id="fast"> Быстрый отклик для живого голоса и игры (на слабых устройствах звук может прерываться)</label>
+      <p class="drawer-note" id="fastNote" hidden>Обновите страницу, чтобы применить.</p>
     </div>
     <button class="btn small" id="dissolveBtn">Растворить звук в атмосфере</button>
     <p class="drawer-note">Мягкость смешивает каналы так, как звук слышен в комнате. Меньше мягкости — направления звучат резче. «Растворить» замораживает атмосферный хвост на 10 секунд: всё, что звучало, превращается в бесконечный аккорд.</p>

@@ -24,9 +24,8 @@ export class Pad {
     this.voices = [];
     this.T = T;
     // медленное «дыхание» фильтра
-    this.lfo = ctx.createOscillator(); this.lfo.frequency.value = rnd(0.03, 0.06);
-    this.lfoDepth = ctx.createGain(); this.lfoDepth.gain.value = T.formants ? 0 : (T.cutoff || 800) * 0.25;
-    this.lfo.connect(this.lfoDepth); this.lfo.start();
+    // медленное «дыхание» фильтра — шагами из общего цикла (без нагрузки на звуковой поток)
+    this.lfoRate = rnd(0.03, 0.06) * Math.PI * 2; this.lfoPhase = Math.random() * 6.28; this.filters = [];
   }
   _voice(midi, idx) {
     const ctx = this.E.ctx, T = this.T, f = mtof(midi);
@@ -42,7 +41,7 @@ export class Pad {
       });
     } else {
       node = ctx.createBiquadFilter(); node.type = 'lowpass'; node.frequency.value = T.cutoff; node.Q.value = T.q;
-      this.lfoDepth.connect(node.frequency); node.connect(v.gain);
+      this.filters.push(node); node.connect(v.gain);
     }
     T.osc.forEach((type, k) => {
       const o = ctx.createOscillator(); o.type = type; o.frequency.value = f * (T.octave && k ? 2 : 1);
@@ -72,9 +71,14 @@ export class Pad {
     });
   }
   setLevel(v, tau = 3) { this.out.gain.setTargetAtTime(v, this.E.ctx.currentTime, tau); }
+  animate(now) {
+    if (!this.filters.length || this.T.formants) return;
+    const f = this.T.cutoff * (1 + 0.25 * Math.sin(this.lfoPhase + now * this.lfoRate));
+    for (const b of this.filters) b.frequency.value = f;
+  }
   dispose(fade = 4) {
     const t = this.E.ctx.currentTime; this.out.gain.setTargetAtTime(0, t, fade / 4);
-    this.E.after(t + fade + 0.5, () => { this.voices.forEach((v) => v.oscs.forEach((o) => { try { o.stop(); } catch (e) {} })); try { this.lfo.stop(); } catch (e) {} this.breath.disconnect(); });
+    this.E.after(t + fade + 0.5, () => { this.voices.forEach((v) => v.oscs.forEach((o) => { try { o.stop(); } catch (e) {} })); this.breath.disconnect(); });
   }
 }
 export const PAD_TIMBRES = Object.fromEntries(Object.entries(TIMBRES).map(([k, v]) => [k, v.name]));

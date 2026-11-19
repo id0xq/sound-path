@@ -70,7 +70,7 @@ export function koshi(E, dest, t, { freq, vel = 0.6 }) {
     const osc = sine(ctx, f, t, end), g = egain(ctx, t, a, 0.002, T / 6.9);
     osc.connect(g); g.connect(o);
   });
-  const n = E.noiseSource('white'), hp = filt(ctx, 'highpass', 6000), g = egain(ctx, t, 0.25, 0.0005, 0.002);
+  const n = E.noiseSource('pink'), hp = filt(ctx, 'highpass', 5000), g = egain(ctx, t, 0.07, 0.001, 0.003);
   n.connect(hp); hp.connect(g); g.connect(o); E.startNoise(n, t); n.stop(t + 0.03);
   return end;
 }
@@ -309,5 +309,131 @@ export function shimmer(E, dest, t, { freqs, dur = 9, vel = 0.5 }) {
     trem.start(t); trem.stop(end);
     osc.connect(tremG); tremG.connect(g); g.connect(o);
   });
+  return end;
+}
+
+// ================= Звукотерапия =================
+const toneCache = new Map();
+
+// Хрустальная поющая чаша: почти чистый тон, медленное «ведение» по краю, плавающее биение
+export function crystalBowl(E, dest, t, { freq = 261.6, vel = 0.6, hold = 10 }) {
+  const ctx = E.ctx, end = t + hold + 16;
+  const o = out(E, dest, 0.14 * vel, end);
+  const wob = ctx.createOscillator(); wob.frequency.value = rnd(0.9, 1.6);
+  const wd = ctx.createGain(); wd.gain.value = 0.18; wob.connect(wd);
+  const wg = ctx.createGain(); wg.gain.value = 0.82; wd.connect(wg.gain); wob.start(t); wob.stop(end);
+  wg.connect(o);
+  [[1, 1, 0], [1, 0.8, rnd(0.25, 0.6)], [2.01, 0.05, 0], [3.0, 0.02, 0]].forEach(([r, a, beat]) => {
+    const osc = sine(ctx, freq * r + beat, t, end);
+    const g = ctx.createGain(); g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(a, t + 3.5); g.gain.setTargetAtTime(0, t + 3.5 + hold, 4.5);
+    osc.connect(g); g.connect(wg);
+  });
+  return end;
+}
+
+// Камертон (по умолчанию «Ом», 136,1 Гц): мягкий удар и очень долгий чистый тон
+export function tuningFork(E, dest, t, { freq = 136.1, vel = 0.6 }) {
+  const ctx = E.ctx, end = t + 22;
+  const o = out(E, dest, 0.2 * vel, end);
+  const osc = sine(ctx, freq, t, end), g = egain(ctx, t, 1, 0.02, 20 / 6.9); osc.connect(g); g.connect(o);
+  const osc2 = sine(ctx, freq * 1.0012, t, end), g2 = egain(ctx, t, 0.5, 0.02, 18 / 6.9); osc2.connect(g2); g2.connect(o);
+  const cl = sine(ctx, freq * 6.26, t, t + 1), gc = egain(ctx, t, 0.12, 0.001, 0.06); cl.connect(gc); gc.connect(o);
+  return end;
+}
+
+// струна с гармониками — один раз синтезируется в буфер и переиспользуется
+function stringTone(E, freq) {
+  const key = Math.round(freq * 10);
+  if (toneCache.has(key)) return toneCache.get(key);
+  const sr = E.ctx.sampleRate, dur = 9, len = Math.floor(sr * dur), buf = E.ctx.createBuffer(1, len, sr), d = buf.getChannelData(0);
+  for (let h = 1; h <= 14; h++) {
+    const f = freq * h * (1 + 0.0004 * h * h); if (f > 9000) break;
+    const amp = (1 / h) * (h % 2 ? 1 : 0.8), tau = 3.2 / Math.pow(h, 0.7), w = (2 * Math.PI * f) / sr, ph = Math.random() * 6.28;
+    for (let i = 0; i < len; i++) d[i] += amp * Math.sin(w * i + ph) * Math.exp(-i / sr / tau);
+  }
+  let peak = 0; for (let i = 0; i < len; i++) peak = Math.max(peak, Math.abs(d[i]));
+  for (let i = 0; i < Math.min(len, 96); i++) d[i] *= i / 96;
+  for (let i = 0; i < len; i++) d[i] /= peak;
+  toneCache.set(key, buf);
+  return buf;
+}
+// Монохорд: десятки струн одного тона — мерцающее облако обертонов
+export function monochord(E, dest, t, { freq = 110, vel = 0.6, strokes = 2 }) {
+  const ctx = E.ctx, buf = stringTone(E, freq), end = t + strokes * 1.6 + 9;
+  const o = out(E, dest, 0.16 * vel, end);
+  const lp = filt(ctx, 'lowpass', 3800, 0.4); lp.connect(o);
+  for (let s = 0; s < strokes; s++) {
+    for (let k = 0; k < 12; k++) {
+      const src = ctx.createBufferSource(); src.buffer = buf;
+      src.playbackRate.value = (k % 3 === 2 ? 2 : 1) * (1 + (Math.random() - 0.5) * 0.004);
+      const g = ctx.createGain(); g.gain.value = rnd(0.35, 0.8) / (k % 3 === 2 ? 2 : 1);
+      src.connect(g); g.connect(lp); src.start(t + s * 1.6 + k * 0.07 + Math.random() * 0.02);
+    }
+  }
+  return end;
+}
+
+// Шрути-бокс: дыхание мехов и язычковый бурдон
+export function shruti(E, dest, t, { freq = 110, vel = 0.6, dur = 12 }) {
+  const ctx = E.ctx, end = t + dur + 4;
+  const o = out(E, dest, 0.05 * vel, end);
+  const lp = filt(ctx, 'lowpass', 1400, 0.5); lp.connect(o);
+  const env = ctx.createGain(); env.gain.setValueAtTime(0, t); env.gain.linearRampToValueAtTime(1, t + 2.5);
+  for (let b = t + 3; b < t + dur; b += 3.2) { env.gain.linearRampToValueAtTime(0.75, b); env.gain.linearRampToValueAtTime(1, b + 1.6); }
+  env.gain.setTargetAtTime(0, t + dur, 1); env.connect(lp);
+  [[1, 'sawtooth', 0.6], [1.5, 'square', 0.18], [2, 'sawtooth', 0.25], [1, 'square', 0.2]].forEach(([r, type, a], i) => {
+    const osc = sine(ctx, freq * r, t, end, type); osc.detune.value = (i - 1.5) * 4;
+    const g = ctx.createGain(); g.gain.value = a; osc.connect(g); g.connect(env);
+  });
+  return end;
+}
+
+// Храмовый колокол: глубокий гул и долгий звон
+export function templeBell(E, dest, t, { freq = 130, vel = 0.6 }) {
+  const ctx = E.ctx, end = t + 20;
+  const o = out(E, dest, 0.09 * vel, end);
+  [[0.5, 0.7, 18], [1, 1, 12], [1.19, 0.45, 8], [1.5, 0.35, 7], [2, 0.5, 6], [2.51, 0.22, 4], [2.98, 0.15, 3], [4.16, 0.08, 2]].forEach(([r, a, T]) => {
+    const osc = sine(ctx, freq * r, t, end), g = egain(ctx, t, a, 0.004, T / 6.9); osc.connect(g); g.connect(o);
+    const b = sine(ctx, freq * r * 1.0015, t, end), gb = egain(ctx, t, a * 0.5, 0.004, T / 6.9); b.connect(gb); gb.connect(o);
+  });
+  const n = E.noiseSource('pink'), lp = filt(ctx, 'lowpass', 1200), gn = egain(ctx, t, 0.25, 0.002, 0.04);
+  n.connect(lp); lp.connect(gn); gn.connect(o); E.startNoise(n, t); n.stop(t + 0.3);
+  return end;
+}
+
+// Ветряные колокольчики: трубочки звенят от ветра, то гуще, то реже
+export function windChimes(E, dest, t, { freqs, dur = 6, vel = 0.5 }) {
+  let tt = t, end = t;
+  while (tt < t + dur) {
+    const u = (tt - t) / dur, f = freqs[Math.floor(Math.random() * freqs.length)];
+    end = Math.max(end, koshi(E, dest, tt, { freq: f * 1.5, vel: vel * (0.4 + 0.6 * Math.sin(Math.PI * u)) * rnd(0.5, 1) }));
+    tt += rnd(0.08, 0.5) * (1.3 - Math.sin(Math.PI * u));
+  }
+  return end;
+}
+
+// Дерево колокольчиков: быстрый каскад сверху вниз
+export function bellTree(E, dest, t, { vel = 0.5, base = 2000 }) {
+  let end = t;
+  for (let i = 0; i < 22; i++) {
+    const tt = t + i * (0.05 + i * 0.003), f = base * Math.pow(2, (22 - i) / 12 * 0.9);
+    end = Math.max(end, koshi(E, dest, tt, { freq: f, vel: vel * (0.5 + 0.5 * (1 - i / 22)) * 0.6 }));
+  }
+  return end;
+}
+
+// Обертоновое пение: низкий бурдон, в котором поёт «свисток» гармоник
+export function overtone(E, dest, t, { freq = 110, vel = 0.6, dur = 12 }) {
+  const ctx = E.ctx, end = t + dur + 3;
+  const o = out(E, dest, 0.06 * vel, end);
+  const src = sine(ctx, freq, t, end, 'sawtooth'), src2 = sine(ctx, freq * 1.003, t, end, 'sawtooth');
+  const env = ctx.createGain(); env.gain.setValueAtTime(0, t); env.gain.linearRampToValueAtTime(1, t + 2); env.gain.setTargetAtTime(0, t + dur, 0.8);
+  const body = filt(ctx, 'lowpass', 700, 0.7), whistle = filt(ctx, 'bandpass', freq * 8, 28);
+  const wg = ctx.createGain(); wg.gain.value = 6;
+  src.connect(body); src2.connect(body); src.connect(whistle); whistle.connect(wg);
+  body.connect(env); wg.connect(env); env.connect(o);
+  const path = [8, 9, 10, 12, 10, 9, 8, 6, 8, 12, 16, 12, 10, 8];
+  path.forEach((h, i) => whistle.frequency.setTargetAtTime(freq * h, t + 1.5 + (i * (dur - 2)) / path.length, 0.25));
   return end;
 }

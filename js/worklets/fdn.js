@@ -64,6 +64,14 @@ class FDN extends AudioWorkletProcessor {
     const rateMul = c.modRate;
 
     const bufs = this.bufs, w = this.w, lp = this.lp, s = this.s, g = this.g, ph = this.ph, inc = this.inc;
+    const d0 = this.d0 || (this.d0 = new Float32Array(16)), dd = this.dd || (this.dd = new Float32Array(16));
+    for (let i = 0; i < 16; i++) {
+      const base = (BASE_MS[i] / 1000) * size * sr;
+      const a0 = base + modDepth * (1 + Math.sin(ph[i]));
+      ph[i] += inc[i] * rateMul * n; if (ph[i] > 6.283185307) ph[i] -= 6.283185307;
+      const a1 = base + modDepth * (1 + Math.sin(ph[i]));
+      d0[i] = a0; dd[i] = (a1 - a0) / n;
+    }
     const pdL = this.pd[0], pdR = this.pd[1], pdLen = pdL.length;
 
     for (let k = 0; k < n; k++) {
@@ -72,7 +80,7 @@ class FDN extends AudioWorkletProcessor {
       pdL[this.pdw] = inL[k]; pdR[this.pdw] = inR[k];
       let ri = this.pdw - pdS; if (ri < 0) ri += pdLen;
       let xL = pdL[ri] * this.inGain, xR = pdR[ri] * this.inGain;
-      this.pdw = (this.pdw + 1) % pdLen;
+      if (++this.pdw >= pdLen) this.pdw = 0;
 
       // срез низа
       const hL = hpA * (this.hpL + xL - this.hpxL); this.hpxL = xL; this.hpL = hL; xL = hL;
@@ -84,17 +92,16 @@ class FDN extends AudioWorkletProcessor {
       // диффузия: размазывает атаки, хвост становится шёлковым
       for (let j = 0; j < 5; j++) {
         const pL = this.aps[0][j], pR = this.aps[1][j];
-        const bL = pL.buf[pL.i], yL = -apg * xL + bL; pL.buf[pL.i] = xL + apg * yL; pL.i = (pL.i + 1) % pL.len; xL = yL;
-        const bR = pR.buf[pR.i], yR = -apg * xR + bR; pR.buf[pR.i] = xR + apg * yR; pR.i = (pR.i + 1) % pR.len; xR = yR;
+        const bL = pL.buf[pL.i], yL = -apg * xL + bL; pL.buf[pL.i] = xL + apg * yL; if (++pL.i >= pL.len) pL.i = 0; xL = yL;
+        const bR = pR.buf[pR.i], yR = -apg * xR + bR; pR.buf[pR.i] = xR + apg * yR; if (++pR.i >= pR.len) pR.i = 0; xR = yR;
       }
 
       // чтение линий с модуляцией
       let outL = 0, outR = 0;
       for (let i = 0; i < 16; i++) {
         const buf = bufs[i], len = buf.length;
-        ph[i] += inc[i] * rateMul; if (ph[i] > 6.283185307) ph[i] -= 6.283185307;
-        const dl = (BASE_MS[i] / 1000) * size * sr + modDepth * (1 + Math.sin(ph[i]));
-        let rp = w[i] - dl; while (rp < 0) rp += len;
+        const dl = d0[i] + dd[i] * k;
+        let rp = w[i] - dl; if (rp < 0) rp += len;
         const i0 = rp | 0, fr = rp - i0, i1 = i0 + 1 >= len ? 0 : i0 + 1;
         const v = buf[i0] + (buf[i1] - buf[i0]) * fr;
         lp[i] = v + (lp[i] - v) * a;

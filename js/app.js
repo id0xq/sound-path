@@ -45,11 +45,17 @@ export class App {
     const src = 'let id=null;onmessage=e=>{clearInterval(id);if(e.data>0)id=setInterval(()=>postMessage(0),e.data)}';
     this.worker = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
     this.worker.onmessage = () => this.tick();
-    this.worker.postMessage(50);
+    this.worker.postMessage(40);
     return this;
   }
   tick() {
     const E = this.E; if (E.ctx.state !== 'running') return;
-    try { this.conductor.tick(E.now, E.now + 0.4); } catch (e) { console.error(e); }
+    const now = E.now;
+    try {
+      this.conductor.tick(now, now + 0.4);
+      if (this.breathwork) this.breathwork.tick(now, now + 0.4);
+      if (this.conductor.pad) this.conductor.pad.animate(now);
+      E.motion(now);
+    } catch (e) { console.error(e); }
   }
 }

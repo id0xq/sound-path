@@ -3,6 +3,7 @@
 //  • Поле — каждое мгновение звука как точка в полукруге: слева — левое ухо, справа — правое, дальше от центра — громче.
 //  • Лиссажу — форма стерео: светящаяся нить, которая дышит вместе со звуком.
 //  • Кристалл — спектр, собранный в шестилучевую снежинку: низы у центра, верха на кончиках лучей.
+//  • Хладни — песок на звучащей пластине: высота звука выбирает узор, песок собирается в узловых линиях.
 import { toPolar, clamp } from './util.js';
 
 export const KIND_COLORS = {
@@ -34,9 +35,9 @@ export class Sphere {
     const loop = () => { this.draw(); requestAnimationFrame(loop); };
     requestAnimationFrame(loop);
   }
-  setMode(m) { this.mode = m; this.ctx.clearRect(0, 0, this.w, this.h); }
+  setMode(m) { this.mode = m; this.ctx.clearRect(0, 0, this.w, this.h); this.img = null; }
   resize() {
-    const r = this.cv.getBoundingClientRect(), dpr = Math.min(2, window.devicePixelRatio || 1);
+    const r = this.cv.getBoundingClientRect(), dpr = Math.min(1.5, window.devicePixelRatio || 1);
     this.w = r.width; this.h = r.height; this.cv.width = Math.round(r.width * dpr); this.cv.height = Math.round(r.height * dpr);
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     this.R = Math.min(this.w, this.h) * 0.4; this.cx = this.w / 2; this.cy = this.h / 2;
@@ -82,6 +83,8 @@ export class Sphere {
     if (this.mode === 'field') return this.drawField();
     if (this.mode === 'lissajous') return this.drawLissajous();
     if (this.mode === 'crystal') return this.drawCrystal();
+    if (this.mode === 'chladni') return this.drawChladni();
+    if (this.mode === 'breath') return this.drawBreath();
     this.drawDome();
   }
 
@@ -121,10 +124,7 @@ export class Sphere {
       c.closePath();
       // зеркальная грань: холодное серебро + отражённый цвет звука
       const rr = Math.round(lerp(214, f.r, lit)), gg = Math.round(lerp(236, f.g, lit)), bb = Math.round(lerp(250, f.b, lit));
-      const grad = c.createLinearGradient(fx - 8, fy - 8, fx + 8, fy + 8);
-      grad.addColorStop(0, `rgba(${rr},${gg},${bb},${base + lit * 0.62})`);
-      grad.addColorStop(1, `rgba(${rr},${gg},${bb},${(base + lit * 0.62) * 0.55})`);
-      c.fillStyle = grad; c.fill();
+      c.fillStyle = `rgba(${rr},${gg},${bb},${(base + lit * 0.62) * (0.8 + 0.2 * Math.cos(f.a0 * 2))})`; c.fill();
       c.strokeStyle = 'rgba(8,20,30,0.6)'; c.lineWidth = 1; c.stroke();
     }
     c.beginPath(); c.arc(cx, cy, R, 0, Math.PI * 2); c.strokeStyle = 'rgba(220,240,255,0.42)'; c.lineWidth = 1.2; c.stroke();
@@ -166,27 +166,43 @@ export class Sphere {
   }
 
   // ---------- Поле (полярные точки) ----------
+  // Каждый сэмпл — крошечная светящаяся точка; точки копятся и медленно гаснут, как на экране анализатора
+  buffer() {
+    const W = this.cv.width, H = this.cv.height;
+    if (!this.img || this.img.width !== W || this.img.height !== H) { this.img = this.ctx.createImageData(W, H); this.acc = new Float32Array(W * H); }
+    return { W, H, img: this.img, acc: this.acc };
+  }
+  flush(col, gain = 1) {
+    const { W, H, img, acc } = this.buffer(), d = img.data;
+    for (let i = 0, j = 0; i < acc.length; i++, j += 4) {
+      const v = acc[i]; if (v < 0.004) { if (d[j + 3]) d[j + 3] = 0; acc[i] = 0; continue; }
+      const a = Math.min(1, v * gain);
+      d[j] = col[0] + (255 - col[0]) * a * a; d[j + 1] = col[1] + (255 - col[1]) * a * a; d[j + 2] = col[2] + (255 - col[2]) * a * a; d[j + 3] = 255 * a;
+    }
+    this.ctx.putImageData(img, 0, 0);
+  }
   drawField() {
-    const c = this.ctx; this.fade(this.reduced ? 1 : 0.2);
-    const n = this.stereo(), L = this.L, Rr = this.Rr;
-    const base = this.h * 0.82, R = Math.min(this.w * 0.46, this.h * 0.74), cx = this.cx;
-    c.strokeStyle = 'rgba(220,240,255,0.16)'; c.lineWidth = 1;
-    c.beginPath(); c.arc(cx, base, R, Math.PI, 0); c.lineTo(cx - R, base); c.stroke();
-    c.beginPath(); c.moveTo(cx, base); c.lineTo(cx - R * 0.707, base - R * 0.707); c.moveTo(cx, base); c.lineTo(cx + R * 0.707, base - R * 0.707); c.stroke();
-    c.fillStyle = 'rgba(237,246,251,0.45)'; c.font = '11px "Golos Text", system-ui'; c.textAlign = 'center';
-    c.fillText('Л', cx - R - 10, base); c.fillText('П', cx + R + 10, base);
-    const col = hexRgb(mix(this.tint, '#bfe7f5', 0.5));
-    c.globalCompositeOperation = 'lighter';
-    c.fillStyle = `rgba(${col.join(',')},0.55)`;
-    const inv = 1 / this.peak;
+    const c = this.ctx, { W, H, acc } = this.buffer();
+    const decay = this.reduced ? 0 : 0.86;
+    for (let i = 0; i < acc.length; i++) acc[i] *= decay;
+    const n = this.stereo(), L = this.L, Rr = this.Rr, dpr = W / this.w;
+    const base = H * 0.84, R = Math.min(W * 0.46, H * 0.76), cx = W / 2, inv = 1 / this.peak;
     for (let i = 0; i < n; i++) {
       const l = L[i], r = Rr[i];
       const m = (l + r) * 0.7071, s = (r - l) * 0.7071;
-      const amp = Math.sqrt(l * l + r * r) * inv; if (amp < 0.01) continue;
+      const amp = Math.sqrt(l * l + r * r) * inv; if (amp < 0.008) continue;
       const th = Math.atan2(s, Math.abs(m)), rad = Math.min(1, Math.sqrt(amp)) * R;
-      c.fillRect(cx + Math.sin(th) * rad, base - Math.cos(th) * rad, 1.7, 1.7);
+      const x = (cx + Math.sin(th) * rad) | 0, y = (base - Math.cos(th) * rad) | 0;
+      if (x >= 0 && x < W && y >= 0 && y < H) acc[y * W + x] += 0.24;
     }
-    c.globalCompositeOperation = 'source-over';
+    this.flush(hexRgb(mix(this.tint, '#bfe7f5', 0.5)), 1);
+    c.save(); c.setTransform(1, 0, 0, 1, 0, 0);
+    c.strokeStyle = 'rgba(220,240,255,0.18)'; c.lineWidth = dpr;
+    c.beginPath(); c.arc(cx, base, R, Math.PI, 0); c.lineTo(cx - R, base); c.stroke();
+    c.beginPath(); c.moveTo(cx, base); c.lineTo(cx - R * 0.707, base - R * 0.707); c.moveTo(cx, base); c.lineTo(cx + R * 0.707, base - R * 0.707); c.stroke();
+    c.fillStyle = 'rgba(237,246,251,0.5)'; c.font = `${11 * dpr}px "Golos Text", system-ui`; c.textAlign = 'center';
+    c.fillText('Л', cx - R - 12 * dpr, base); c.fillText('П', cx + R + 12 * dpr, base);
+    c.restore();
   }
 
   // ---------- Лиссажу ----------
@@ -249,6 +265,86 @@ export class Sphere {
       }
     }
     c.globalCompositeOperation = 'source-over';
+  }
+  // ---------- Пластина Хладни ----------
+  drawChladni() {
+    const c = this.ctx, E = this.app.E;
+    const MODES = [[1, 2], [1, 3], [2, 3], [1, 4], [3, 4], [2, 5], [1, 5], [3, 5], [4, 5], [2, 6], [1, 6], [5, 6], [3, 7], [2, 7], [4, 7], [6, 7], [5, 8], [3, 8]];
+    if (!this.sand) {
+      this.sand = new Float32Array(12000 * 2);
+      for (let i = 0; i < this.sand.length; i++) this.sand[i] = Math.random() * 2 - 1;
+      this.mode2 = [3, 5]; this.modeSign = -1; this.pend = null;
+      this.fb = new Float32Array(E.anL.frequencyBinCount);
+    }
+    // какая нота звучит сильнее всего → какой узор на пластине
+    E.anL.getFloatFrequencyData(this.fb);
+    const n = this.fb.length, hz = E.ctx.sampleRate / 2 / n;
+    let best = -200, bi = 0; for (let i = Math.floor(70 / hz); i < Math.floor(1800 / hz); i++) if (this.fb[i] > best) { best = this.fb[i]; bi = i; }
+    const energy = clamp((best + 80) / 45, 0, 1);
+    if (energy > 0.15) {
+      const f = bi * hz, idx = Math.floor((Math.log2(f / 70) * 4.2) % MODES.length);
+      const want = MODES[(idx + MODES.length) % MODES.length];
+      if (!this.pend || this.pend.m !== want) this.pend = { m: want, t: performance.now() };
+      else if (performance.now() - this.pend.t > 450 && want !== this.mode2) { this.mode2 = want; this.modeSign = Math.random() < 0.5 ? -1 : 1; }
+    }
+    const [a, b] = this.mode2, sg = this.modeSign, P = Math.PI;
+    const shake = this.reduced ? 0 : 0.012 + energy * 0.05;
+    const S = this.sand;
+    for (let i = 0; i < S.length; i += 2) {
+      const x = S[i], y = S[i + 1], X = (x + 1) / 2, Y = (y + 1) / 2;
+      const u = Math.cos(a * P * X) * Math.cos(b * P * Y) + sg * Math.cos(b * P * X) * Math.cos(a * P * Y);
+      const k = Math.abs(u) * shake;
+      let nx = x + (Math.random() - 0.5) * k * 2, ny = y + (Math.random() - 0.5) * k * 2;
+      if (nx < -1) nx = -1 - (nx + 1); if (nx > 1) nx = 1 - (nx - 1); if (ny < -1) ny = -1 - (ny + 1); if (ny > 1) ny = 1 - (ny - 1);
+      S[i] = nx; S[i + 1] = ny;
+    }
+    const { W, H, acc } = this.buffer();
+    for (let i = 0; i < acc.length; i++) acc[i] *= 0.55;
+    const side = Math.min(W, H) * 0.78, ox = (W - side) / 2, oy = (H - side) / 2, half = side / 2;
+    for (let i = 0; i < S.length; i += 2) {
+      const x = (ox + half + S[i] * half) | 0, y = (oy + half + S[i + 1] * half) | 0;
+      if (x >= 0 && x < W - 1 && y >= 0 && y < H - 1) { const j = y * W + x; acc[j] += 0.5; acc[j + 1] += 0.3; acc[j + W] += 0.3; acc[j + W + 1] += 0.2; }
+    }
+    this.flush(hexRgb(mix(this.tint, '#e8f6ff', 0.6)), 1.2);
+    c.save(); c.setTransform(1, 0, 0, 1, 0, 0);
+    c.strokeStyle = 'rgba(220,240,255,0.28)'; c.lineWidth = W / this.w;
+    c.strokeRect(ox - 2, oy - 2, side + 4, side + 4);
+    c.fillStyle = 'rgba(237,246,251,0.45)'; c.font = `${11 * W / this.w}px "Golos Text", system-ui`; c.textAlign = 'center';
+    c.fillText(`узор ${a}·${b}`, W / 2, oy + side + 22 * W / this.w);
+    c.restore();
+  }
+
+  // ---------- Шар дыхания ----------
+  drawBreath() {
+    const c = this.ctx, A = this.app, E = A.E, now = E.now, cx = this.cx, cy = this.cy, R = this.R;
+    c.clearRect(0, 0, this.w, this.h);
+    const st = A.breathwork && A.breathwork.state(now);
+    if (!st) return;
+    const col = hexRgb(this.tint);
+    const r = R * (0.32 + 0.58 * st.fill);
+    // орбита прогресса программы
+    const prog = A.breathwork.progress(now);
+    c.strokeStyle = 'rgba(220,240,255,0.14)'; c.lineWidth = 2;
+    c.beginPath(); c.arc(cx, cy, R * 1.02, 0, Math.PI * 2); c.stroke();
+    c.strokeStyle = `rgba(${col.join(',')},0.8)`; c.lineCap = 'round';
+    c.beginPath(); c.arc(cx, cy, R * 1.02, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * prog); c.stroke();
+    // ледяной шар
+    const g = c.createRadialGradient(cx - r * 0.3, cy - r * 0.35, r * 0.05, cx, cy, r);
+    g.addColorStop(0, 'rgba(255,255,255,0.55)'); g.addColorStop(0.35, `rgba(${col.join(',')},0.35)`); g.addColorStop(1, `rgba(${col.join(',')},0.05)`);
+    c.fillStyle = g; c.beginPath(); c.arc(cx, cy, r, 0, Math.PI * 2); c.fill();
+    c.strokeStyle = 'rgba(235,248,255,0.55)'; c.lineWidth = 1.2; c.beginPath(); c.arc(cx, cy, r, 0, Math.PI * 2); c.stroke();
+    // шесть граней-лучей, как у снежинки
+    c.strokeStyle = 'rgba(235,248,255,0.16)'; c.lineWidth = 1;
+    for (let k = 0; k < 6; k++) { const an = k * Math.PI / 3 + now * 0.02; c.beginPath(); c.moveTo(cx + Math.cos(an) * r * 0.3, cy + Math.sin(an) * r * 0.3); c.lineTo(cx + Math.cos(an) * r * 0.95, cy + Math.sin(an) * r * 0.95); c.stroke(); }
+    // фаза внутри фазы — тонкая дуга
+    if (st.k !== undefined && !st.open) { c.strokeStyle = 'rgba(255,255,255,0.75)'; c.lineWidth = 2.5; c.beginPath(); c.arc(cx, cy, r + 8, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * st.k); c.stroke(); }
+    c.fillStyle = '#f2fbff'; c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.font = `${Math.round(R * 0.15)}px Forum, Georgia, serif`;
+    c.fillText(st.label || '', cx, cy - R * 0.05);
+    c.font = `${Math.round(R * 0.1)}px "Golos Text", system-ui`; c.fillStyle = 'rgba(242,251,255,0.8)';
+    const sec = Math.max(0, st.remain);
+    c.fillText(st.open ? `${Math.floor(sec)} с` : `${Math.ceil(sec)}`, cx, cy + R * 0.12);
+    if (st.rounds) { c.font = `${Math.round(R * 0.06)}px "Golos Text", system-ui`; c.fillStyle = 'rgba(242,251,255,0.55)'; c.fillText(`раунд ${st.round || 1} из ${st.rounds}`, cx, cy + R * 0.26); }
   }
 }
 

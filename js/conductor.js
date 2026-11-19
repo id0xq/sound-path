@@ -31,11 +31,12 @@ export class Conductor {
   get chapter() { return this.set && this.chapterIdx >= 0 ? this.set.chapters[this.chapterIdx] : null; }
   get duration() { return this.set ? this.set.duration : 0; }
 
+  loadSet(set, seed) { return this.load(set, seed); }
   load(setId, seed) {
     if (this.running) this.stop(true);
     this.rng = new Rng(seed);
     this.seed = seed;
-    this.set = setId === 'free' ? makeFreeSet(this.rng) : SETS.find((s) => s.id === setId);
+    this.set = typeof setId === 'object' ? setId : setId === 'free' ? makeFreeSet(this.rng) : SETS.find((s) => s.id === setId);
     this.ding = this.set.base + this.rng.pick(this.set.transpose || [0]);
     this.curDing = this.ding + (this.set.chapters[0].root || 0);
     this.state = merge(DEFAULTS, this.set.chapters[0]);
@@ -161,6 +162,17 @@ export class Conductor {
 
     this.pendingEvents = (S.events || []).map((e) => ({ at: ch.at + e.t, type: e.type, done: ch.at + e.t < this.elapsed - 1 }));
     this.emit('chapter', { idx, ch, S });
+  }
+
+  // Конструктор: заменить звучание текущей главы на лету (тексты и время главы остаются)
+  applyLive(patch) {
+    if (!this.running || !this.set || this.chapterIdx < 0) return false;
+    const idx = this.chapterIdx, ch = this.set.chapters[idx];
+    const keep = { at: ch.at, title: ch.title, color: ch.color, cue: ch.cue, script: ch.script };
+    this.set.chapters[idx] = { ...patch, ...keep };
+    this.applyChapter(idx, 3);
+    this.pendingEvents = (patch.events || []).map((e) => ({ at: this.elapsed + e.t, type: e.type, done: false }));
+    return true;
   }
 
   setTempoFactor(f) {

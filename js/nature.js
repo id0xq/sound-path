@@ -31,12 +31,11 @@ export class Nature {
     this.windGust = ctx.createGain(); this.windGust.gain.value = 0.8; this.windGust.connect(wind);
     stereoNoise('brown', (n, ch) => {
       const bp = filt(ctx, 'bandpass', ch ? 520 : 400, 0.55);
-      const lfo = ctx.createOscillator(); lfo.frequency.value = ch ? 0.053 : 0.071; const d = ctx.createGain(); d.gain.value = 170;
-      lfo.connect(d); d.connect(bp.frequency); lfo.start();
+      (this.windBands ||= []).push(bp);
       n.connect(bp); const g2 = ctx.createGain(); g2.gain.value = 1.4; bp.connect(g2); return g2;
     }).connect(this.windGust);
     const whistle = E.noiseSource('pink'), wbp = filt(ctx, 'bandpass', 900, 8), wg = ctx.createGain(); wg.gain.value = 0.035;
-    const wl = ctx.createOscillator(); wl.frequency.value = 0.031; const wd = ctx.createGain(); wd.gain.value = 500; wl.connect(wd); wd.connect(wbp.frequency); wl.start();
+    this.whistleBand = wbp;
     whistle.connect(wbp); wbp.connect(wg); wg.connect(this.windGust); E.startNoise(whistle, ctx.currentTime);
 
     // Листва
@@ -73,12 +72,12 @@ export class Nature {
 
     // Сверчки — в нескольких точках пространства
     bed('crickets');
-    this.cricketEms = [polar(-120, -10, 7), polar(70, -12, 9), polar(160, -8, 12)].map((p) => E.spawn({ group: 'nature', pos: p, send: 0.3, kind: 'crickets', label: 'сверчок' }));
+    this.cricketEms = [polar(-120, -10, 7), polar(70, -12, 9), polar(160, -8, 12)].map((p) => E.spawn({ group: 'nature', pos: p, send: 0.3, kind: 'crickets', label: 'сверчок', hrtf: false }));
     this.cricketNext = [0, 0, 0];
 
     // Костёр — впереди и чуть ниже
     bed('fire', 0.15);
-    this.fireEm = E.spawn({ group: 'nature', pos: polar(10, -25, 2.6), send: 0.2, kind: 'fire', label: 'костёр' });
+    this.fireEm = E.spawn({ group: 'nature', pos: polar(10, -25, 2.6), send: 0.2, kind: 'fire', label: 'костёр', hrtf: false });
     this.fireIn = ctx.createGain(); this.fireIn.gain.value = 0; this.fireIn.connect(this.fireEm.input);
     const fn = E.noiseSource('brown'), flp = filt(ctx, 'lowpass', 260), fg = ctx.createGain(); fg.gain.value = 0.5;
     fn.connect(flp); flp.connect(fg); fg.connect(this.fireIn); E.startNoise(fn, ctx.currentTime);
@@ -106,6 +105,12 @@ export class Nature {
   tick(now, horizon, S) {
     const E = this.E, ctx = E.ctx, lv = this.levels;
     this.motion = S.motion || 'still';
+    // ветер: полосы медленно плывут
+    if (lv.wind > 0.01) {
+      this.windBands[0].frequency.value = 400 + 170 * Math.sin(now * 0.446);
+      this.windBands[1].frequency.value = 520 + 170 * Math.sin(now * 0.333 + 1);
+      this.whistleBand.frequency.value = 900 + 400 * Math.sin(now * 0.195);
+    }
     // порывы ветра
     if (lv.wind > 0.01 && now >= this.nextGust) {
       this.windGust.gain.setTargetAtTime(rnd(0.45, 1.25), now, rnd(0.8, 2.2));

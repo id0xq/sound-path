@@ -21,7 +21,7 @@ const VEL = { X: 1, x: 0.72, o: 0.42, '?': 0.45 };
 
 const POS = {
   dum: polar(0, -10, 2.4), tek: polar(14, -6, 2.4), lub: polar(0, -28, 1.4), dub: polar(0, -28, 1.4),
-  shaker: polar(40, 6, 2.2), udu: polar(-42, -6, 2.6), hp: polar(-10, 2, 2.8), rattle: polar(58, 12, 2.4),
+  shaker: polar(40, 6, 2.2), udu: polar(-42, -6, 2.6), hp: polar(-8, -4, 1.8), rattle: polar(58, 12, 2.4),
 };
 const KIND = { dum: 'rhythm', tek: 'rhythm', lub: 'heart', dub: 'heart', shaker: 'rattle', udu: 'rhythm', hp: 'handpan', rattle: 'rattle' };
 
@@ -31,7 +31,7 @@ export class Rhythm {
     this.ems = {};
     for (const k of Object.keys(POS)) {
       if (k === 'dub') continue;
-      this.ems[k] = this.E.spawn({ group: 'rhythm', pos: POS[k], send: k === 'lub' ? 0.08 : 0.25, kind: KIND[k], label: k });
+      this.ems[k] = this.E.spawn({ group: 'rhythm', pos: POS[k], send: k === 'lub' ? 0.08 : 0.25, kind: KIND[k], label: k, hrtf: k === 'hp' });
     }
     this.ems.dub = this.ems.lub;
     this.pattern = null; this.pending = undefined; this.step = 0; this.nextTime = 0;
