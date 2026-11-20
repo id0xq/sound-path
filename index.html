@@ -203,9 +203,21 @@
       <div class="pads" id="pads"></div>
       <h4 class="pads-title">Звукотерапия</h4>
       <div class="pads" id="padsHeal"></div>
+      <h4 class="pads-title">Сердце и волны мозга</h4>
+      <div class="waves">
+        <button class="pad heart-pad" id="heartBtn" aria-pressed="false" style="--c:#ffa9b6"><span class="n">Сердцебиение</span><span class="k">y</span><span class="sw"></span></button>
+        <div class="seg small" id="heartRate" role="radiogroup" aria-label="Темп сердца">
+          <button data-bpm="set" role="radio" aria-checked="true">в темп сета</button>
+          <button data-bpm="50" role="radio" aria-checked="false">50</button>
+          <button data-bpm="60" role="radio" aria-checked="false">60</button>
+          <button data-bpm="72" role="radio" aria-checked="false">72</button>
+        </div>
+        <div class="seg small waves-seg" id="brainWaves" role="radiogroup" aria-label="Волны мозга"></div>
+        <p class="hint" id="wavesHint">Бинауральные волны слышны только в наушниках: в каждое ухо — свой тон, мозг слышит разницу как мягкую пульсацию.</p>
+      </div>
       <div class="pads-foot">
         <label class="btn ghost small file-btn">Добавить свой звук<input type="file" id="fileIn" accept="audio/*"></label>
-        <span class="keys-hint">Клавиши: A S D F G H J K L — ханг, цифры — инструменты</span>
+        <span class="keys-hint">Клавиши: A S D F G H J K L — ханг, цифры и буквы на плашках — инструменты, Y — сердце</span>
       </div>
     </div>
   </section>

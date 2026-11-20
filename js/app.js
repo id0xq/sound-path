@@ -68,6 +68,7 @@ export class App {
     try {
       this.conductor.tick(now, now + 0.4);
       if (this.breathwork) this.breathwork.tick(now, now + 0.4);
+      this.live.tick(now, now + 0.4);
       if (this.conductor.pad) this.conductor.pad.animate(now);
       E.motion(now);
       if ((this._lv = (this._lv || 0) + 1) % 6 === 0) E.autoLevel();

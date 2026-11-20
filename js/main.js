@@ -1,6 +1,7 @@
 // Интерфейс: связывает кнопки, купол, ханг и панели с аудиодвижком.
 import { App } from './app.js';
 import { SETS } from './sets.js';
+import { BRAINWAVES } from './live.js';
 import { motionAvailable } from './headtrack.js';
 import { SPACES } from './dsp.js';
 import { TUNINGS } from './theory.js';
@@ -51,7 +52,7 @@ function boot() {
   sphere = new Sphere($('#dome'), app);
   buildSpaces(); buildSets(); buildPads(); buildHang(); bindHang(); buildMixer(); bindVoice(); bindRecorder(); bindSettings(); bindPlacement(); bindKeys();
   app.breathwork = new Breathwork(app);
-  bindLines(); bindNarrator(); bindHead(); bindViz(); bindTabs(); bindBreath(); bindBuilder(); bindMedia();
+  bindLines(); bindNarrator(); bindHead(); bindViz(); bindTabs(); bindBreath(); bindBuilder(); bindMedia(); bindWaves();
 
   C.on('load', renderSet);
   C.on('chapter', ({ idx, ch }) => {
@@ -159,6 +160,33 @@ function renderSet(set) {
   sphere.tint = first.color;
   $('#tempo').parentElement.querySelector('label').textContent = set.id === 'walk30' ? 'Темп шага' : 'Темп ритма';
   syncTransport(); buildHang();
+}
+
+// ---------- Сердце и волны мозга ----------
+function bindWaves() {
+  const L = app.live, hb = $('#heartBtn');
+  const toggle = () => { const on = !L.heart.on; L.setHeart(on); hb.setAttribute('aria-pressed', String(on)); hb.classList.toggle('on', on); };
+  hb.addEventListener('click', toggle);
+  $$('#heartRate button').forEach((b) => b.addEventListener('click', () => {
+    const v = b.dataset.bpm === 'set' ? 'set' : Number(b.dataset.bpm); L.heart.bpm = v;
+    $$('#heartRate button').forEach((x) => x.setAttribute('aria-checked', String(x === b)));
+  }));
+  const box = $('#brainWaves'), hint = $('#wavesHint'), base = hint.textContent;
+  for (const w of BRAINWAVES) {
+    const b = document.createElement('button'); b.dataset.w = w.id; b.setAttribute('role', 'radio'); b.setAttribute('aria-checked', String(w.id === 'off'));
+    b.textContent = w.name; if (w.hint) b.title = w.hint;
+    b.addEventListener('click', () => {
+      app.binaural.setOverride(w.hz);
+      $$('#brainWaves button').forEach((x) => x.setAttribute('aria-checked', String(x === b)));
+      hint.textContent = w.hz ? `${w.name}: ${w.hint}. Слышно только в наушниках. Громкость — «Бинауральный тон» в микшере.` : base;
+    });
+    box.appendChild(b);
+  }
+  window.addEventListener('keydown', (e) => {
+    if (e.code !== 'KeyY' || e.repeat) return;
+    const tag = (e.target && e.target.tagName) || ''; if (/INPUT|TEXTAREA|SELECT/.test(tag)) return;
+    toggle();
+  });
 }
 
 // ---------- Пауза и фоновая работа ----------
@@ -352,7 +380,9 @@ function bindKeys() {
     if (e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
     const tag = (e.target.tagName || '').toLowerCase();
     if (tag === 'input' && e.target.type !== 'range' && e.target.type !== 'checkbox' || tag === 'select' || tag === 'textarea') return;
-    const k = e.key.toLowerCase();
+    // физическая клавиша: работает и в русской раскладке
+    const code = e.code || '', PUNCT = { Comma: ',', Period: '.', Slash: '/', Minus: '-', Equal: '=' };
+    const k = code.startsWith('Key') ? code.slice(3).toLowerCase() : code.startsWith('Digit') ? code.slice(5) : PUNCT[code] || e.key.toLowerCase();
     const hi = HANG_KEYS.indexOf(k);
     if (hi >= 0 && hi < app.live.notes().length) { hitHang(hi, 0.72); e.preventDefault(); return; }
     const p = LIVE.find((x) => x.key === k);

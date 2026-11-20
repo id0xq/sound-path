@@ -292,6 +292,11 @@ input[type="checkbox"] { accent-color: var(--glacier); width: 16px; height: 16px
 
 /* ---------- Пэды звукотерапии ---------- */
 .pads-title { font-family: var(--display); font-size: 19px; color: var(--mirror); margin: 4px 0 -4px; }
+.waves { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+.waves .heart-pad { min-width: 150px; }
+.waves .heart-pad[aria-pressed="true"] { border-color: var(--c); background: color-mix(in srgb, var(--c) 14%, transparent); }
+.waves-seg { flex-wrap: wrap; border-radius: 18px; }
+.waves .hint { flex-basis: 100%; margin: 0; }
 
 /* ---------- Конструктор ---------- */
 .builder { position: fixed; inset: 0; z-index: 40; display: grid; place-items: stretch; padding: 14px; background: rgba(6, 14, 22, 0.6); }

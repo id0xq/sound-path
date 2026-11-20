@@ -159,6 +159,7 @@ export class Generators {
   // ---------- Сюжетные события ----------
   fire(type, t, S) {
     const E = this.E, C = this.C, r = this.rng;
+    const F = this.app.field || { tuned: () => null };
     const one = (pos, kind, label, send, fn) => {
       const em = E.spawn({ group: 'instr', pos, send, kind, label });
       const end = fn(em.input);
@@ -166,12 +167,12 @@ export class Generators {
       return em;
     };
     switch (type) {
-      case 'bowl': return one(polar(r.range(-8, 8), -12, 2), 'bowl', 'чаша', 0.35, (d) => I.bowl(E, d, t, { freq: mtof(C.ding + 12), vel: 0.75 }));
-      case 'bowlSing': return one(polar(0, -10, 2.2), 'bowl', 'поющая чаша', 0.4, (d) => I.bowl(E, d, t, { freq: mtof(C.ding + 12), vel: 0.6, mode: 'sing', hold: 10 }));
-      case 'tingsha': return one(polar(0, 40, 2.4), 'bells', 'тингши', 0.5, (d) => I.tingsha(E, d, t, { freq: mtof(C.ding + 48) * 0.94, vel: 0.6 }));
+      case 'bowl': return one(polar(r.range(-8, 8), -12, 2), 'bowl', 'чаша', 0.35, (d) => F.tuned(d, t, 'bowl', C.curDing + r.pick([12, 19, 24]), { vel: 0.75 }) ?? I.bowl(E, d, t, { freq: mtof(C.ding + 12), vel: 0.75 }));
+      case 'bowlSing': return one(polar(0, -10, 2.2), 'bowl', 'поющая чаша', 0.4, (d) => F.tuned(d, t, 'bowlsing', C.curDing + 12, { vel: 0.45, att: 2, dur: 12, rel: 4, hold: true }) ?? I.bowl(E, d, t, { freq: mtof(C.ding + 12), vel: 0.6, mode: 'sing', hold: 10 }));
+      case 'tingsha': return one(polar(0, 40, 2.4), 'bells', 'тингши', 0.5, (d) => F.tuned(d, t, 'tingsha', C.curDing + 48, { vel: 0.9 }) ?? I.tingsha(E, d, t, { freq: mtof(C.ding + 48) * 0.94, vel: 0.6 }));
       case 'koshi': return one(polar(r.range(-60, 60), 45, 3), 'bells', 'колокольчики', 0.55,
         (d) => I.koshiStrum(E, d, t, { freqs: scaleInRange(S.tuning, C.ding, C.ding + 34, C.ding + 46, { pentatonic: true }).map(mtof), count: 7, spread: 2.2 }));
-      case 'gong': return one(polar(0, 0, 4.5), 'gong', 'гонг', 0.5, (d) => I.gong(E, d, t, { freq: mtof(C.ding - 12), vel: 0.7 }));
+      case 'gong': return one(polar(0, 0, 4.5), 'gong', 'гонг', 0.5, (d) => F.tuned(d, t, 'gong', C.curDing - 12, { vel: 0.6 }) ?? I.gong(E, d, t, { freq: mtof(C.ding - 12), vel: 0.7 }));
       case 'oceanDrum': {
         const em = one(polar(-80, 0, 3), 'water', 'океанский барабан', 0.45, (d) => I.oceanDrum(E, d, t, { dur: 8, vel: 0.7 }));
         em.path([{ t, pos: polar(-85, 5, 3) }, { t: t + 4, pos: polar(0, 25, 2.5) }, { t: t + 8, pos: polar(85, 5, 3) }]); return em;
@@ -198,12 +199,12 @@ export class Generators {
       }
       case 'flyby': this.app.birds.flyby(t); return null;
       case 'dissolve': setTimeout(() => E.dissolve(10), Math.max(0, (t - E.now) * 1000)); return null;
-      case 'crystal': return one(polar(r.range(-40, 40), 10, 2.4), 'wash', 'хрустальная чаша', 0.5, (d) => I.crystalBowl(E, d, t, { freq: mtof(C.ding + 12), hold: 10 }));
+      case 'crystal': return one(polar(r.range(-40, 40), 10, 2.4), 'wash', 'хрустальная чаша', 0.5, (d) => F.tuned(d, t, 'crystal', C.curDing + 12, { vel: 0.4, att: 1.5, dur: 11, rel: 4, hold: true }) ?? I.crystalBowl(E, d, t, { freq: mtof(C.ding + 12), hold: 10 }));
       case 'fork': return one(polar(0, 0, 1.8), 'bells', 'камертон', 0.3, (d) => I.tuningFork(E, d, t, { freq: 136.1 }));
       case 'monochord': return one(polar(r.range(-90, 90), 0, 2.6), 'wash', 'монохорд', 0.5, (d) => I.monochord(E, d, t, { freq: mtof(C.ding - 12), strokes: 3 }));
-      case 'templeBell': return one(polar(r.range(-120, 120), 5, 6), 'gong', 'храмовый колокол', 0.6, (d) => I.templeBell(E, d, t, { freq: mtof(C.ding) * 0.75 }));
+      case 'templeBell': return one(polar(r.range(-120, 120), 5, 7), 'gong', 'храмовый колокол', 0.6, (d) => F.tuned(d, t, 'templebell', C.curDing + 36, { vel: 0.42 }) ?? I.templeBell(E, d, t, { freq: mtof(C.ding) * 0.75 }));
       case 'chimes': return one(polar(r.range(-150, 150), 40, 3), 'bells', 'ветряные колокольчики', 0.5, (d) => I.windChimes(E, d, t, { freqs: scaleInRange(S.tuning, C.ding, C.ding + 24, C.ding + 36, { pentatonic: true }).map(mtof), dur: 6 }));
-      case 'belltree': return one(polar(0, 60, 2.4), 'bells', 'дерево колокольчиков', 0.5, (d) => I.bellTree(E, d, t, { base: mtof(C.ding + 36) }));
+      case 'belltree': return one(polar(r.range(-150, 150), 40, 7), 'bells', 'дерево колокольчиков', 0.75, (d) => I.bellTree(E, d, t, { base: mtof(C.ding + 36), vel: 0.3 }));
       case 'overtone': return one(polar(0, -5, 2), 'wash', 'обертоны', 0.45, (d) => I.overtone(E, d, t, { freq: mtof(C.ding - 12), dur: 12 }));
     }
     return null;

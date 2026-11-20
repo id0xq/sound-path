@@ -5,7 +5,7 @@
 // Фон звучит из четырёх точек вокруг слушателя: спереди — одна часть записи, сзади — другая, поэтому
 // пространство обволакивает и остаётся на месте, когда вы поворачиваете голову. Голос птицы или зверя
 // звучит из своего места в 3D, как и синтезированные голоса раньше. Пока запись грузится, звучит синтез.
-import { polar } from './util.js';
+import { polar, tuning } from './util.js';
 
 // какие фоны заменяют синтезированные слои природы
 const LAYER_BED = { wind: 'wind', stream: 'stream', waves: 'waves', rain: 'rain', crickets: 'crickets', fire: 'fire',
@@ -131,6 +131,50 @@ export class Field {
     src.start(t, Math.max(0, off - 0.02), len + 0.05);
     this.E.after(t + len + 0.1, () => gn.disconnect());
     return t + len;
+  }
+  // Нота записи на нужной высоте: берём ноту записи, ближайшую по высоте, и чуть транспонируем (не больше
+  // полуоктавы — тембр остаётся живым). Варианты чередуются, поэтому инструмент каждый раз звучит немного по-другому.
+  // dur — сколько держать (с мягким отпуском rel), hold — тянуть дольше записи бесшовно (бурдоны).
+  tuned(dest, t, name, midi, { vel = 0.7, dur, rel = 0.4, att = 0.008, hold = false } = {}) {
+    const key = 'call:' + name, b = this.buf[key], M = this.meta && this.meta.calls[name];
+    if (!M) return null;
+    if (!b) { this.load('call', name); return null; }
+    let cands = M.segs.map((s, i) => {
+      let d = midi - s[4]; if (Math.abs(d) > 6) d -= 12 * Math.round(d / 12);
+      return { s, d, i };
+    }).filter((c) => c.s[4] > 0);
+    if (!cands.length) return null;
+    const best = Math.min(...cands.map((c) => Math.abs(c.d)));
+    cands = cands.filter((c) => Math.abs(c.d) <= best + 2);
+    if (cands.length > 1) cands = cands.filter((c) => c.i !== this.sel[name]);
+    const c = cands[Math.floor(Math.random() * cands.length)]; this.sel[name] = c.i;
+    const [off, len0, g] = c.s;
+    const rate = Math.pow(2, c.d / 12) * (tuning.a4 / 440) * (1 + (Math.random() - 0.5) * 0.004);
+    const amp = g * vel, len = len0 / rate, ctx = this.E.ctx;
+    const voice = (vt, vOff, vLen, a, r, last) => {
+      const src = ctx.createBufferSource(); src.buffer = b; src.playbackRate.value = rate;
+      const gn = ctx.createGain(); const end = vt + vLen;
+      gn.gain.setValueAtTime(0, vt); gn.gain.linearRampToValueAtTime(amp, vt + Math.max(0.004, a));
+      gn.gain.setValueAtTime(amp, Math.max(vt + a, end - r)); gn.gain.linearRampToValueAtTime(0, end);
+      src.connect(gn); gn.connect(dest); src.start(vt, Math.max(0, vOff), vLen * rate + 0.05);
+      this.E.after(end + 0.1, () => gn.disconnect());
+      return end;
+    };
+    let end;
+    const want = dur ?? len;
+    if (!hold || want + rel <= len - 0.1) end = voice(t, off - 0.005, Math.min(len, want + rel), att, Math.min(rel, len * 0.5), true);
+    else {
+      // бесшовная протяжка: голоса из середины ноты сменяют друг друга с перекрёстным затуханием
+      const xf = Math.min(1.5, len * 0.25), loopOff = off + len0 * 0.3, seg = (len0 * 0.65) / rate;
+      let vt = t, first = true; const stop = t + want + rel; let n = 0;
+      while (vt < stop && n++ < 30) {
+        const vLen = Math.min(first ? len : seg, stop - vt);
+        end = voice(vt, first ? off - 0.005 : loopOff, vLen, first ? att : xf, vt + vLen >= stop - 0.01 ? rel : xf, false);
+        vt = end - xf; first = false;
+      }
+    }
+    this.E.noteOn && this.E.noteOn(midi, t, vel, Math.min(4, (end - t)));
+    return end;
   }
   count(name) { const M = this.meta && this.meta.calls[name]; return M ? M.segs.length : 0; }
   preload(names) { names.forEach(([k, n]) => this.load(k, n)); }

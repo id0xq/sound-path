@@ -90,9 +90,20 @@ python3 serve.py
 - «Взять то, что звучит» — открыть текущую главу как набор блоков.
 - Сцены сохраняются, из них собирается «Мой сет» с длительностью каждой сцены и плавными переходами.
 
-## Звукотерапия
+## Живые инструменты и звукотерапия
 
-Хрустальная чаша, камертон «Ом» 136,1 Гц, монохорд, шрути, храмовый колокол, ветряные колокольчики, дерево колокольчиков, обертоновое пение и «Растворение» — на панели живых звуков и внутри глав сетов.
+Панель под куполом: тингши, чаши, поющая чаша, окарина, калимба, погремушка, дождевая палка, океанский барабан, гонг, барабан, птицы и звукотерапия — хрустальная чаша, камертоны, монохорд, шрути, храмовый колокол, ветряные колокольчики, дерево колокольчиков, обертоновое пение, глюкофон, диджериду, поющее стекло, шаманский бубен, лира и «Растворение».
+
+- **Настоящие записи.** Окарина, чаши, хрусталь, тингши, гонг, калимба, глюкофон, лира, поющее стекло, шрути, диджериду, храмовый колокол, бубен, погремушки и дождевая палка звучат живыми записями (Freesound, CC0).
+- **В строе сета.** Каждая нота записи подстраивается под строй и аккорд сюжета (не больше чем на полуоктаву, поэтому тембр остаётся живым). Запускать можно в любой момент — всё гармонично.
+- **В темп.** Если идёт ритм или грув, инструмент вступает на ближайшую долю, а рисунки (арпеджио калимбы, фраза окарины, бубен) идут в темпе сета.
+- **Каждый раз по-новому.** У каждого инструмента несколько вариантов исполнения: другие ноты аккорда, рисунок, сила и число ударов, место в пространстве. Тот же вариант дважды подряд не повторяется.
+- Дерево колокольчиков звучит вдали и мягко, чтобы не перетягивать внимание.
+
+## Сердце и волны мозга
+
+- **Сердцебиение** — живая запись сердца, в темпе сета или 50, 60, 72 удара в минуту. Клавиша Y.
+- **Волны мозга** — бинауральный тон поверх сюжета: дельта 2 Гц (сон), тета 6 Гц (медитация), альфа 10 Гц (покой), бета 14 Гц (ясность), гамма 40 Гц (собранность). Несущая настроена на тонику сета. Слышно только в наушниках; громкость — «Бинауральный тон» в микшере.
 
 ### Голос ведущего
 
@@ -202,7 +213,7 @@ WAV без потерь (около 11 МБ в минуту) или сжатый
 ### Авторы записей
 
 - Киты: Ocean Song (oceansong.live) — NOAA SanctSound, Hawaiian Islands Humpback Whale NMS (public domain); MBARI MARS Cabled Observatory (CC BY 4.0).
-- Записи природы с Freesound, лицензия CC0:
+- Записи природы и инструментов с Freesound, лицензия CC0:
   - Dawn Chorus Birdsong — squashy555, https://freesound.org/people/squashy555/sounds/573080/
   - Numerous birds in Essex Woodland.WAV — jackmichaelking, https://freesound.org/people/jackmichaelking/sounds/518671/
   - The sound of a babbling brook — hoshisato, https://freesound.org/people/hoshisato/sounds/853672/
@@ -237,3 +248,31 @@ WAV без потерь (около 11 МБ в минуту) или сжатый
   - CourtshipDrummingOfWoodpecker.wav — JKata, https://freesound.org/people/JKata/sounds/620236/
   - Single bumblebee.WAV — VMan533, https://freesound.org/people/VMan533/sounds/575899/
   - Dolphin screaming underwater in Caribbean Sea (Mexico) — felix.blume, https://freesound.org/people/felix.blume/sounds/161691/
+  - Dry Ocarina in C.wav — TheDCHeck, https://freesound.org/people/TheDCHeck/sounds/379378/
+  - Ocarinas.wav — clement.bernardeau, https://freesound.org/people/clement.bernardeau/sounds/699229/
+  - Reverbera n0 8 - Ocarina - Sustained Pitch — REVERBERA, https://freesound.org/people/REVERBERA/sounds/850855/
+  - TIBETAN BOWL - 1 — SamuelGremaud, https://freesound.org/people/SamuelGremaud/sounds/518705/
+  - TIBETAN BOWL - 2 — SamuelGremaud, https://freesound.org/people/SamuelGremaud/sounds/518704/
+  - Singing Bowl, long without reverb — hollandm, https://freesound.org/people/hollandm/sounds/573805/
+  - Aud Pure tone 12” #2.m4a — Asuriya, https://freesound.org/people/Asuriya/sounds/530848/
+  - Serene Crystal Singing Bowls — RedwoodRunner, https://freesound.org/people/RedwoodRunner/sounds/460416/
+  - Tingsha Cymbal — steffcaffrey, https://freesound.org/people/steffcaffrey/sounds/435074/
+  - Gong Brilliant Paiste 32" — JensZygar, https://freesound.org/people/JensZygar/sounds/486629/
+  - Temple Gong 2 — kerozenne, https://freesound.org/people/kerozenne/sounds/803159/
+  - Kalimba Scale Descending — A_Curious_coder, https://freesound.org/people/A_Curious_coder/sounds/537519/
+  - Kalimba.wav — MirkoMeter84, https://freesound.org/people/MirkoMeter84/sounds/177480/
+  - Rainstick 39 sec.aiff — AncientOracle, https://freesound.org/people/AncientOracle/sounds/476851/
+  - Bell at Daitokuji temple,kyoto.wav — nahmandub, https://freesound.org/people/nahmandub/sounds/131348/
+  - Shruti Box — iluppai, https://freesound.org/people/iluppai/sounds/95345/
+  - Rattles.wav — Mrthenoronha, https://freesound.org/people/Mrthenoronha/sounds/387215/
+  - 3 Egg Shaker Rolls — brunoboselli, https://freesound.org/people/brunoboselli/sounds/249706/
+  - Heartbeats 61.wav — patobottos, https://freesound.org/people/patobottos/sounds/369017/
+  - Steel tongue drum 9 samples.wav — tosha73, https://freesound.org/people/tosha73/sounds/497849/
+  - Didgeridoo — Naschkatze1210, https://freesound.org/people/Naschkatze1210/sounds/671786/
+  - Didgeridoo.wav — Jandre160108, https://freesound.org/people/Jandre160108/sounds/437396/
+  - singingGlass_mono.wav — Zabuhailo, https://freesound.org/people/Zabuhailo/sounds/145513/
+  - Glass Harp.wav — BeeProductive, https://freesound.org/people/BeeProductive/sounds/382286/
+  - shamanic drum 2.ogg — adharca, https://freesound.org/people/adharca/sounds/275377/
+  - shamanic drum 1.ogg — adharca, https://freesound.org/people/adharca/sounds/275376/
+  - Lyre.flac — Hedmarking, https://freesound.org/people/Hedmarking/sounds/191883/
+  - Harp Glissando Down.aiff — Cunningar0807, https://freesound.org/people/Cunningar0807/sounds/436129/

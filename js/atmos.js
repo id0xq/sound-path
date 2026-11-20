@@ -134,17 +134,23 @@ export class Binaural {
     this.l.connect(m, 0, 0); this.r.connect(m, 0, 1); m.connect(this.gain); this.gain.connect(E.binauralBus);
     this.l.frequency.value = 110; this.r.frequency.value = 118; this.l.start(); this.r.start();
     this.carrier = 110; this.beat = 8; this.user = 0.5; this.enabled = true; this.scene = 0;
+    this.override = null;   // выбранные проводником волны мозга (Гц) — важнее, чем настройка главы
   }
   set({ carrier, beat, scene, tau = 8 } = {}) {
     const t = this.E.ctx.currentTime;
     if (carrier) this.carrier = carrier;
     if (beat !== undefined && beat !== null) this.beat = beat;
     if (scene !== undefined) this.scene = scene;
+    const b = this.override ?? this.beat;
     this.l.frequency.setTargetAtTime(this.carrier, t, tau / 3);
-    this.r.frequency.setTargetAtTime(this.carrier + this.beat, t, tau / 3);
+    this.r.frequency.setTargetAtTime(this.carrier + b, t, tau / 3);
     this.apply(tau);
   }
-  apply(tau = 1) { this.gain.gain.setTargetAtTime(this.enabled ? 0.018 * this.user * this.scene : 0, this.E.ctx.currentTime, tau / 3); }
+  setOverride(hz, tau = 6) { this.override = hz || null; this.set({ tau }); }
+  apply(tau = 1) {
+    const scene = this.override ? 1 : this.scene;
+    this.gain.gain.setTargetAtTime(this.enabled ? 0.018 * this.user * scene : 0, this.E.ctx.currentTime, tau / 3);
+  }
 }
 
 // Дыхательная волна: атмосфера поднимается на вдохе и опускается на выдохе.
