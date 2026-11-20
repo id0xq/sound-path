@@ -72,7 +72,7 @@ export const SETS = [
         space: 'forest', spaceMix: 0.6, tuning: 'kurd', chord: [-12, 0, 7, 12, 15],
         pad: { timbre: 'warm', level: 0.26 }, wash: 0.2, handpan: 0.45, ocarina: 0.2, kalimba: 0.15, bells: 0.08,
         birds: 0.45, species: ['cuckoo', 'thrush', 'dove', 'wren', 'distant'],
-        nature: { wind: 0.25, leaves: 0.3, stream: 0.2 }, rhythm: 'walkGroove2', tempo: 76, rhythmLevel: 0.62, fauna: { woodpecker: 0.2 },
+        nature: { wind: 0.25, leaves: 0.3, stream: 0.2 }, rhythm: 'walkGroove2', tempo: 76, rhythmLevel: 0.5, fauna: { woodpecker: 0.2 },
         motion: 'walk', binaural: 10, transition: 10,
         events: [{ t: 0, type: 'bowl' }, { t: 100, type: 'flyby' }, { t: 200, type: 'rainstick' }],
         cue: 'Снова в путь, чуть бодрее. Ритм становится живым — позвольте телу самому найти шаг. С каждым шагом мысленно говорите: «я здесь». Почувствуйте, как бьётся сердце.',

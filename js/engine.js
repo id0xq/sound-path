@@ -104,6 +104,11 @@ export class Engine {
     this.crossfeed = createCrossfeed(ctx);
     this.musicSum.connect(this.carve); this.carve.connect(this.tame); this.tame.connect(this.air); this.air.connect(this.crossfeed.input);
     this.musicOut = G(2.1);   // калибровка: тихие главы около −27 дБ, ритмичные около −20 дБ
+    // Мягкий выравниватель: медленно подтягивает слишком громкие и слишком тихие главы к ровному уровню,
+    // оставляя часть динамики сюжета. Голос проводника идёт мимо и не меняется.
+    this.leveler = G(1); this.levelAn = ctx.createAnalyser(); this.levelAn.fftSize = 2048;
+    this.musicOut.connect(this.levelAn); this.musicOut.connect(this.leveler);
+    this.lvl = { env: 0, gainDb: 0, n: 0 };
     this.crossfeed.output.connect(this.musicOut);
 
     // --- Голос ---
@@ -113,14 +118,14 @@ export class Engine {
 
     // --- Наушники ---
     this.outSum = G();
-    this.musicOut.connect(this.outSum); this.voiceMonitor.connect(this.outSum); this.binauralBus.connect(this.outSum);
+    this.leveler.connect(this.outSum); this.voiceMonitor.connect(this.outSum); this.binauralBus.connect(this.outSum);
     this.hpVol = G(0.9);
     this.outLimiter = makeLimiter(ctx);
     this.outSum.connect(this.hpVol); this.hpVol.connect(this.outLimiter); this.outLimiter.connect(ctx.destination);
 
     // --- Запись (не зависит от громкости наушников) ---
     this.recSum = G();
-    this.musicOut.connect(this.recSum); this.voiceRec.connect(this.recSum); this.binauralBus.connect(this.recSum);
+    this.leveler.connect(this.recSum); this.voiceRec.connect(this.recSum); this.binauralBus.connect(this.recSum);
     this.recLimiter = makeLimiter(ctx);
     this.recSum.connect(this.recLimiter);
     this.recTap = G();
@@ -215,7 +220,6 @@ export class Engine {
     clearTimeout(this._dissolveT);
     this._dissolveT = setTimeout(() => this.atmosRev.port.postMessage({ freeze: 0 }), seconds * 1000);
   }
-  prewarmSpaces() {}
 
   setSoftness(v) {
     this.softness = clamp(v, 0, 1);
@@ -239,6 +243,19 @@ export class Engine {
       this._cueYaw = yaw; this._cuePitch = pitch;
       for (const v of this.viz.values()) if (v.updateCue) v.updateCue();
     }
+  }
+
+  // Выравниватель громкости: цель −20 дБ, поправка на 60 % отклонения, от −9 до +3 дБ, плавно
+  autoLevel() {
+    const L = this.lvl, a = this._lvlBuf || (this._lvlBuf = new Float32Array(this.levelAn.fftSize));
+    this.levelAn.getFloatTimeDomainData(a);
+    let s = 0; for (let i = 0; i < a.length; i += 2) s += a[i] * a[i];
+    const ms = s / (a.length / 2);
+    L.env = L.env ? L.env + (ms - L.env) * 0.12 : ms;
+    const db = 10 * Math.log10(L.env + 1e-12);
+    const target = db < -55 ? 0 : clamp(-(db + 20) * 0.6, -9, 3);
+    L.gainDb += (target - L.gainDb) * 0.25;
+    this.leveler.gain.setTargetAtTime(dbToGain(L.gainDb), this.now, 1.2);
   }
 
   // Моторный цикл: двигает все источники по их путям

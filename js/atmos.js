@@ -1,5 +1,5 @@
 // Атмосфера: пэды с плавной сменой аккордов, танпура, бинауральный тон, дыхательная волна.
-import { mtof, clamp } from './util.js';
+import { mtof } from './util.js';
 
 const rnd = (a, b) => a + Math.random() * (b - a);
 
@@ -182,4 +182,3 @@ export class Breath {
   }
 }
 
-export const clampLevel = (v) => clamp(v, 0, 1.5);

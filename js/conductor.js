@@ -148,7 +148,7 @@ export class Conductor {
     // жанровый грув (lo-fi, соул-джаз, фанк, хип-хоп, эмбиент-пульс) заменяет медитативный ритм
     if (S.groove && S.groove.style) {
       A.groove.set(S.groove, fade);
-      E.setGroup('groove', { scene: S.grooveLevel ?? 0.8, tau: A.groove.active ? fade / 4 : 1 });
+      E.setGroup('groove', { scene: (S.grooveLevel ?? 0.8) * 0.8, tau: A.groove.active ? fade / 4 : 1 });
     } else if (A.groove.active) {
       A.groove.set(null, fade); E.setGroup('groove', { scene: 0, tau: fade / 4 });
     }
