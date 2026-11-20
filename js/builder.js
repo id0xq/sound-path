@@ -9,6 +9,9 @@ import { PAD_TIMBRES } from './atmos.js';
 import { EVENT_NAMES } from './generators.js';
 import { KIND_COLORS } from './sphere.js';
 import { NOTE_NAMES } from './util.js';
+import { STYLES, STYLE_NAMES } from './groove.js';
+import { KIT_NAMES } from './sampler.js';
+import { ANIMALS } from './fauna.js';
 
 const opt = (o) => Object.entries(o).map(([v, l]) => ({ v, l: typeof l === 'string' ? l : l.name }));
 const CHORDS = {
@@ -18,6 +21,7 @@ const CHORDS = {
 const SPECIES = {
   'robin,thrush,distant': 'Утренний лес', 'tit,chaffinch,cuckoo': 'Солнечный день', 'dove,nightingale': 'Вечер и соловьи',
   'cuckoo,thrush,dove,distant': 'Глубина леса', 'robin,dove,distant': 'Тихий сад',
+  'blackbird,oriole,wren': 'Певцы лета', 'blackbird,robin,thrush': 'Вечерний хор',
 };
 const HEAL = ['crystal', 'fork', 'monochord', 'templeBell', 'chimes', 'belltree', 'overtone', 'bowl', 'bowlSing', 'gong', 'tingsha', 'koshi', 'shimmer', 'rainstick', 'oceanDrum', 'chimesOrbit', 'dissolve'];
 const lvl = (k, label = 'Громкость', max = 1) => ({ k, type: 'level', label, max });
@@ -27,6 +31,7 @@ export const BLOCKS = [
     fields: [{ k: 'space', type: 'select', label: 'Тип', options: opt(SPACES) }, lvl('spaceMix', 'Глубина', 1)] },
   { id: 'motion', name: 'Движение звука', cat: 'Пространство', color: '#bfe7f5', always: true,
     fields: [{ k: 'motion', type: 'select', label: 'Как движется', options: [{ v: 'still', l: 'Вокруг, плавно' }, { v: 'walk', l: 'Прогулка: мимо и назад' }, { v: 'orbit', l: 'Кружит вокруг головы' }, { v: 'float', l: 'Парит над головой' }] }] },
+  { id: 'underwater', name: 'Под водой', cat: 'Пространство', color: '#8fe3f5', on: 'underwater', fields: [lvl('underwater', 'Глубина', 1)] },
   { id: 'tuning', name: 'Строй и аккорд', cat: 'Гармония', color: '#f0d49a', always: true,
     fields: [{ k: 'tuning', type: 'select', label: 'Строй ханга', options: opt(TUNINGS) },
       { k: 'root', type: 'select', label: 'Сдвиг тональности', options: [-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6].map((v) => ({ v: String(v), l: (v > 0 ? '+' : '') + v + ' пт' })) },
@@ -45,14 +50,24 @@ export const BLOCKS = [
   { id: 'heal', name: 'Звукотерапия', cat: 'Инструменты', color: KIND_COLORS.wash, on: 'healEvery',
     fields: [{ k: 'healEvent', type: 'select', label: 'Звук', options: HEAL.map((v) => ({ v, l: EVENT_NAMES[v] || v })) },
       { k: 'healEvery', type: 'range', label: 'Каждые, секунд', min: 20, max: 240, step: 10 }] },
+  { id: 'groove', name: 'Грув', cat: 'Ритм', color: '#f7b99a', on: 'groove.style',
+    fields: [{ k: 'groove.style', type: 'select', label: 'Стиль', options: opt(STYLE_NAMES) }, lvl('groove.energy', 'Энергия'),
+      { k: 'groove.tempo', type: 'range', label: 'Темп, уд/мин', min: 56, max: 120, step: 1 },
+      { k: 'groove.kit', type: 'select', label: 'Барабаны', options: [{ v: '', l: 'Как в стиле' }, ...opt(KIT_NAMES)] },
+      lvl('groove.bass', 'Бас', 1.5), lvl('groove.keys', 'Клавиши и пэды', 1.5), lvl('groove.lead', 'Флейта'), lvl('groove.chops', 'Вокальные чопы'),
+      lvl('grooveLevel', 'Громкость', 1.2)] },
   { id: 'rhythm', name: 'Ритм', cat: 'Ритм', color: KIND_COLORS.rhythm, on: 'rhythm',
     fields: [{ k: 'rhythm', type: 'select', label: 'Рисунок', options: opt(PATTERNS) }, { k: 'tempo', type: 'range', label: 'Темп, уд/мин', min: 40, max: 120, step: 1 }, lvl('rhythmLevel', 'Громкость')] },
   { id: 'birds', name: 'Птицы', cat: 'Природа', color: KIND_COLORS.bird, on: 'birds', fields: [{ k: 'species', type: 'select', label: 'Какие', options: opt(SPECIES) }, lvl('birds', 'Сколько')] },
   ...[['wind', 'Ветер'], ['leaves', 'Листва'], ['stream', 'Ручей'], ['waves', 'Волны'], ['rain', 'Дождь'], ['crickets', 'Сверчки'], ['fire', 'Костёр']].map(([k, n]) => ({
     id: k, name: n, cat: 'Природа', color: KIND_COLORS[k === 'stream' || k === 'waves' || k === 'rain' ? 'water' : k === 'fire' ? 'fire' : k === 'crickets' ? 'crickets' : 'bird'], on: 'nature.' + k, fields: [lvl('nature.' + k, 'Громкость', 1)],
   })),
+  ...Object.entries(ANIMALS).map(([k, a]) => ({
+    id: 'fauna-' + k, name: a.name, cat: 'Животные', color: k === 'whales' || k === 'dolphins' || k === 'frogs' ? KIND_COLORS.water : KIND_COLORS.bird,
+    on: 'fauna.' + k, fields: [lvl('fauna.' + k, k === 'cat' || k === 'cicadas' ? 'Громкость' : 'Как часто', 1)],
+  })),
 ];
-const DEF_ON = { 'pad.level': 0.28, wash: 0.25, tanpura: 0.3, binaural: 8, breath: 5.5, handpan: 0.3, bells: 0.2, ocarina: 0.25, kalimba: 0.15, healEvery: 90, rhythm: 'heartwalk', birds: 0.35 };
+const DEF_ON = { 'groove.style': 'lofi', underwater: 0.6, 'pad.level': 0.28, wash: 0.25, tanpura: 0.3, binaural: 8, breath: 5.5, handpan: 0.3, bells: 0.2, ocarina: 0.25, kalimba: 0.15, healEvery: 90, rhythm: 'heartwalk', birds: 0.35 };
 
 const get = (o, path) => path.split('.').reduce((a, k) => (a == null ? a : a[k]), o);
 const set = (o, path, v) => { const ks = path.split('.'); let a = o; ks.slice(0, -1).forEach((k) => { a[k] = a[k] && typeof a[k] === 'object' ? a[k] : {}; a = a[k]; }); a[ks[ks.length - 1]] = v; };
@@ -91,6 +106,8 @@ export class Builder {
     s.species = typeof s.species === 'string' ? s.species.split(',') : s.species;
     s.root = Number(s.root) || 0; s.binaural = Number(s.binaural) || 0; s.breath = Number(s.breath) || 0;
     if (s.rhythm === '' || s.rhythm === 'null') s.rhythm = null;
+    if (!s.groove || !s.groove.style) s.groove = null;
+    s.underwater = Number(s.underwater) || 0;
     const events = [];
     if (this.blocks.includes('heal') && s.healEvery) {
       const total = minutes ? minutes * 60 : 1800;
@@ -116,6 +133,12 @@ export class Builder {
     if (id === 'heal' && !this.scene.healEvent) this.scene.healEvent = 'crystal';
     if (id === 'birds' && !this.scene.species) this.scene.species = 'robin,thrush,distant';
     if (id === 'rhythm') { this.scene.tempo = this.scene.tempo || 66; this.scene.rhythmLevel = this.scene.rhythmLevel || 0.5; }
+    if (id === 'groove') {
+      const g = this.scene.groove = { energy: 0.6, drums: 1, bass: 1, keys: 1, lead: 0.4, chops: 0.2, kit: '', ...(this.scene.groove || {}) };
+      g.style = g.style || 'lofi'; g.tempo = g.tempo || STYLES[g.style].tempo; this.scene.grooveLevel = this.scene.grooveLevel || 0.8;
+      if (STYLES[g.style].tuning) this.scene.tuning = STYLES[g.style].tuning;
+    }
+    if (id.startsWith('fauna-') && !this.scene.fauna) this.scene.fauna = {};
     this.blocks.push(id); this.render(); this.changed();
   }
   remove(id) { this.blocks = this.blocks.filter((x) => x !== id); this.render(); this.changed(); }
@@ -181,7 +204,11 @@ export class Builder {
           f.options.forEach((o) => { const op = el('option', '', o.l); op.value = o.v; input.appendChild(op); });
           input.value = Array.isArray(cur) ? cur.join(',') : String(cur ?? '');
           if (input.selectedIndex < 0 && f.options[0]) input.value = f.options[0].v;
-          input.addEventListener('change', () => { let v = input.value; if (['root', 'binaural', 'breath'].includes(f.k)) v = Number(v); set(this.scene, f.k, v); this.changed(); });
+          input.addEventListener('change', () => {
+            let v = input.value; if (['root', 'binaural', 'breath'].includes(f.k)) v = Number(v); set(this.scene, f.k, v);
+            if (f.k === 'groove.style' && STYLES[v]) { this.scene.groove.tempo = STYLES[v].tempo; this.scene.tuning = STYLES[v].tuning; this.render(); }
+            this.changed();
+          });
         } else {
           input = el('input'); input.type = 'range';
           input.min = f.type === 'level' ? 0 : f.min; input.max = f.type === 'level' ? f.max : f.max; input.step = f.type === 'level' ? 0.01 : f.step;

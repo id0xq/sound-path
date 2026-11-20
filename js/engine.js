@@ -25,6 +25,22 @@ export class Engine {
     this.head = { yaw: 0, pitch: 0 };
     this.irCache = {};
     this.fdnOk = false;
+    this.notes = [];               // недавние ноты — для пластины Хладни
+  }
+
+  // Нота прозвучала (или прозвучит в момент t): пластина Хладни покажет её узор
+  noteOn(midi, t, vel = 0.6, decay = 1.5) {
+    if (!isFinite(midi)) return;
+    this.notes.push({ midi, t, vel, decay });
+    if (this.notes.length > 48) this.notes.splice(0, this.notes.length - 48);
+  }
+
+  // Под водой: весь музыкальный фон темнеет и становится глухим, голос проводника остаётся ясным
+  setUnderwater(v = 0, fade = 4) {
+    v = clamp(v, 0, 1); this.underwater = v;
+    this.air.frequency.setTargetAtTime(14500 * Math.pow(700 / 14500, v), this.now, Math.max(0.1, fade / 3));
+    // глухой звук кажется тише — немного возвращаем громкость
+    this.musicOut.gain.setTargetAtTime(2.1 * (1 + 0.55 * v), this.now, Math.max(0.1, fade / 3));
   }
 
   async init() {
@@ -113,7 +129,7 @@ export class Engine {
     [this.anL, this.anR].forEach((a) => { a.fftSize = 8192; a.smoothingTimeConstant = 0.75; });
     split.connect(this.anL, 0); split.connect(this.anR, 1);
 
-    for (const name of ['atmos', 'nature', 'birds', 'instr', 'rhythm', 'live', 'resonance', 'narrator']) this.createGroup(name);
+    for (const name of ['atmos', 'nature', 'birds', 'instr', 'rhythm', 'groove', 'live', 'resonance', 'narrator']) this.createGroup(name);
 
     this.setSoftness(this.softness);
     this.setSpace('temple', 0.01);

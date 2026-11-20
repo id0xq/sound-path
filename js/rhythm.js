@@ -38,6 +38,8 @@ export class Rhythm {
     this.tempo = { from: 66, to: 66, t0: 0, t1: 0 };
   }
   get key() { return this.pending !== undefined ? this.pending : this.pattern; }
+  get patternDef() { return PATTERNS[this.pattern]; }
+  get spb() { const P = PATTERNS[this.pattern]; return P ? P.spb : 4; }
   setPattern(key) {
     if (key === this.pattern && this.pending === undefined) return;
     if (!this.pattern) { this.pattern = key; this.step = 0; this.nextTime = 0; this.pending = undefined; }
@@ -58,6 +60,12 @@ export class Rhythm {
     return tt;
   }
   beatDur() { return this.pattern ? 60 / this.bpmAt(this.E.now) : 0.8; }
+  nextBar(t) {
+    if (!this.pattern || !this.nextTime) return t;
+    const P = PATTERNS[this.pattern]; let tt = this.nextTime, s = this.step;
+    while (tt < t || s % (P.spb * 4) !== 0) { tt += this.stepDur(tt); s++; if (tt - t > 16) break; }
+    return tt;
+  }
   get active() { return !!this.pattern; }
 
   tick(now, horizon) {
@@ -71,6 +79,8 @@ export class Rhythm {
         if (!this.pattern) return;
         P = PATTERNS[this.pattern];
       }
+      // начало такта (четыре доли): ханг-импровизатор строит свой квадрат
+      if (this.step % (P.spb * 4) === 0 && this.app.improv) this.app.improv.onBar(this.nextTime, { beat: 60 / this.bpmAt(this.nextTime), spb: P.spb, chord: null, source: 'rhythm' });
       this.playStep(P, this.step, this.nextTime);
       this.nextTime += this.stepDur(this.nextTime);
       this.step++;

@@ -3,6 +3,7 @@
 // Поля, которых нет в главе, берутся из DEFAULTS. Можно свободно менять и добавлять главы.
 // Тексты ведущего по главам лежат в scripts.js.
 import { SCRIPTS, FREE_LINES } from './scripts.js';
+import { STORIES } from './stories.js';
 
 export const DEFAULTS = {
   space: 'temple', spaceMix: 0.55,
@@ -12,13 +13,14 @@ export const DEFAULTS = {
   birds: 0, species: ['robin', 'thrush', 'distant'],
   nature: { wind: 0, leaves: 0, stream: 0, waves: 0, rain: 0, crickets: 0, fire: 0 },
   rhythm: null, tempo: 66, rhythmLevel: 0.6,
+  groove: null, grooveLevel: 0.8, fauna: {}, underwater: 0,
   binaural: 8, breath: 0, motion: 'still',
   color: '#7fc4c0', transition: 14, events: [],
 };
 
 export const SETS = [
   {
-    id: 'walk30',
+    id: 'walk30', group: 'Медитации',
     title: 'Прогулка',
     subtitle: 'Голос проводника и шаг под ритм',
     minutes: 30,
@@ -49,8 +51,8 @@ export const SETS = [
         at: 480, title: 'Ручей', color: '#79c3d6',
         space: 'forest', spaceMix: 0.55, tuning: 'amara', chord: [-12, 0, 7, 10, 15],
         pad: { timbre: 'warm', level: 0.22 }, wash: 0.18, handpan: 0.32, ocarina: 0.35, bells: 0.05,
-        birds: 0.55, species: ['thrush', 'robin', 'cuckoo', 'chaffinch', 'distant'],
-        nature: { wind: 0.22, leaves: 0.25, stream: 0.55 }, rhythm: 'walkGroove', tempo: 72, rhythmLevel: 0.6,
+        birds: 0.55, species: ['thrush', 'robin', 'cuckoo', 'blackbird', 'chaffinch', 'distant'],
+        nature: { wind: 0.22, leaves: 0.25, stream: 0.55 }, fauna: { woodpecker: 0.35, frogs: 0.15 }, rhythm: 'walkGroove', tempo: 72, rhythmLevel: 0.6,
         motion: 'walk', binaural: 10,
         events: [{ t: 6, type: 'rainstick' }, { t: 130, type: 'flyby' }],
         cue: 'Слушайте воду. Ручей проходит рядом и остаётся позади — так же, как мысли, которые не нужно удерживать. Замечайте звуки: слева, справа, сверху. Где-то далеко перекликаются окарины.',
@@ -59,7 +61,7 @@ export const SETS = [
         at: 840, title: 'Поляна света', color: '#f1d48a',
         space: 'cloud', spaceMix: 0.7, tuning: 'pentaMaj', root: 3, chord: [-12, 0, 7, 12, 16],
         pad: { timbre: 'glass', level: 0.28 }, wash: 0.4, handpan: 0.15, bells: 0.5,
-        birds: 0.7, species: ['robin', 'thrush', 'tit', 'chaffinch', 'nightingale'],
+        birds: 0.7, species: ['robin', 'oriole', 'tit', 'chaffinch', 'blackbird'], fauna: { bees: 0.5 },
         nature: { wind: 0.18, leaves: 0.2, stream: 0.12 }, rhythm: null,
         motion: 'still', binaural: 8, transition: 12,
         events: [{ t: 0, type: 'tingsha' }, { t: 5, type: 'shimmer' }, { t: 35, type: 'chimesOrbit' }, { t: 120, type: 'chimes' }, { t: 170, type: 'koshi' }, { t: 240, type: 'shimmer' }],
@@ -69,8 +71,8 @@ export const SETS = [
         at: 1140, title: 'Тропа сердца', color: '#e59a7c',
         space: 'forest', spaceMix: 0.6, tuning: 'kurd', chord: [-12, 0, 7, 12, 15],
         pad: { timbre: 'warm', level: 0.26 }, wash: 0.2, handpan: 0.45, ocarina: 0.2, kalimba: 0.15, bells: 0.08,
-        birds: 0.45, species: ['cuckoo', 'thrush', 'dove', 'distant'],
-        nature: { wind: 0.25, leaves: 0.3, stream: 0.2 }, rhythm: 'walkGroove2', tempo: 76, rhythmLevel: 0.62,
+        birds: 0.45, species: ['cuckoo', 'thrush', 'dove', 'wren', 'distant'],
+        nature: { wind: 0.25, leaves: 0.3, stream: 0.2 }, rhythm: 'walkGroove2', tempo: 76, rhythmLevel: 0.62, fauna: { woodpecker: 0.2 },
         motion: 'walk', binaural: 10, transition: 10,
         events: [{ t: 0, type: 'bowl' }, { t: 100, type: 'flyby' }, { t: 200, type: 'rainstick' }],
         cue: 'Снова в путь, чуть бодрее. Ритм становится живым — позвольте телу самому найти шаг. С каждым шагом мысленно говорите: «я здесь». Почувствуйте, как бьётся сердце.',
@@ -98,7 +100,7 @@ export const SETS = [
     ],
   },
   {
-    id: 'love45',
+    id: 'love45', group: 'Медитации',
     title: 'Благодарность и любовь',
     subtitle: 'Медитация сидя или лёжа, дыхание сердца',
     minutes: 45,
@@ -150,7 +152,7 @@ export const SETS = [
         at: 1860, title: 'Океан любви', color: '#7fb6d9',
         space: 'infinity', spaceMix: 0.8, tuning: 'sabye', root: 5, chord: [-12, 0, 7, 12, 14, 19],
         pad: { timbre: 'glass', level: 0.32 }, handpan: 0.12, wash: 0.5, bells: 0.1,
-        nature: { waves: 0.45 }, rhythm: null, breath: 5, motion: 'float', binaural: 5, transition: 18,
+        nature: { waves: 0.45 }, fauna: { whales: 0.35 }, rhythm: null, breath: 5, motion: 'float', binaural: 5, transition: 18,
         events: [{ t: 2, type: 'oceanDrum' }, { t: 100, type: 'monochord' }, { t: 190, type: 'bowl' }, { t: 250, type: 'crystal' }, { t: 300, type: 'oceanDrum' }],
         cue: 'Растворитесь. Любовь как океан: в ней нет границы между вами и миром. Ничего не нужно делать — просто будьте. Дайте звуку говорить, сделайте длинную паузу.',
       },
@@ -158,7 +160,7 @@ export const SETS = [
         at: 2280, title: 'Отдать миру', color: '#f2d27e',
         space: 'temple', spaceMix: 0.6, tuning: 'astra', chord: [-12, 0, 7, 12, 16],
         pad: { timbre: 'warm', level: 0.3 }, handpan: 0.35, wash: 0.25, ocarina: 0.2, bells: 0.25,
-        birds: 0.5, species: ['robin', 'thrush', 'dove', 'nightingale'], nature: { stream: 0.2 },
+        birds: 0.5, species: ['robin', 'blackbird', 'oriole', 'dove', 'nightingale'], nature: { stream: 0.2 },
         rhythm: 'pulse', tempo: 60, rhythmLevel: 0.32, binaural: 8,
         events: [{ t: 0, type: 'tingsha' }, { t: 70, type: 'flyby' }, { t: 200, type: 'koshi' }],
         cue: 'Поделитесь этим светом. Отправьте любовь близким, потом тем, с кем было непросто, и наконец всему миру. Звук светлеет, как утро. Просыпаются птицы.',
@@ -176,6 +178,9 @@ export const SETS = [
 ];
 
 SETS.forEach((s) => s.chapters.forEach((ch, i) => { ch.script = (SCRIPTS[s.id] || [])[i] || []; }));
+// новые сюжеты (йога-нидра, киты, ночной лес, жанровые приключения) — со своими текстами внутри
+SETS.splice(2, 0, ...STORIES.filter((s) => s.group === 'Медитации'));
+SETS.push(...STORIES.filter((s) => s.group !== 'Медитации'));
 
 // Свободная атмосфера: бесконечный поток глав, собранный из зерна вариации
 export function makeFreeSet(rng) {
@@ -196,9 +201,11 @@ export function makeFreeSet(rng) {
       tanpura: rng.chance(0.3) ? rng.range(0.15, 0.3) : 0,
       wash: rng.range(0.1, 0.5), handpan: rng.range(0.05, 0.45), bells: rng.range(0, 0.3), ocarina: rng.chance(0.4) ? rng.range(0.1, 0.35) : 0,
       kalimba: rng.chance(0.25) ? 0.15 : 0,
-      birds: outdoor ? rng.range(0.2, 0.6) : rng.range(0, 0.15), species: rng.pick([['robin', 'thrush', 'distant'], ['tit', 'chaffinch', 'cuckoo'], ['dove', 'nightingale'], ['robin', 'dove', 'distant']]),
+      birds: outdoor ? rng.range(0.2, 0.6) : rng.range(0, 0.15), species: rng.pick([['robin', 'thrush', 'distant'], ['tit', 'chaffinch', 'cuckoo'], ['dove', 'nightingale'], ['robin', 'dove', 'distant'], ['blackbird', 'oriole', 'wren'], ['blackbird', 'robin', 'thrush']]),
       nature: { wind: outdoor ? rng.range(0.1, 0.35) : 0, leaves: outdoor ? rng.range(0, 0.25) : 0, stream: rng.chance(0.35) ? rng.range(0.15, 0.4) : 0, waves: rng.chance(0.2) ? 0.35 : 0, rain: rng.chance(0.15) ? 0.15 : 0, crickets: rng.chance(0.15) ? 0.3 : 0, fire: rng.chance(0.1) ? 0.3 : 0 },
       rhythm: rng.chance(0.3) ? rng.pick(['heartbeat', 'pulse', 'cradle', 'heartwalk']) : null, tempo: rng.int(54, 72), rhythmLevel: 0.4,
+      groove: rng.chance(0.12) ? { style: 'ambient', energy: rng.range(0.25, 0.45), lead: 0.3 } : null, grooveLevel: 0.6,
+      fauna: rng.pick([{}, {}, {}, { whales: 0.4 }, { owls: 0.4 }, { frogs: 0.35 }, { dolphins: 0.3 }, { woodpecker: 0.3 }, { loon: 0.4 }, { bees: 0.5 }]),
       motion: rng.pick(['still', 'still', 'orbit', 'float']), binaural: rng.pick([6, 8, 10]), breath: rng.chance(0.2) ? 5.5 : 0, transition: 20,
       events: [{ t: 1, type: rng.pick(['bowl', 'koshi', 'tingsha', 'shimmer', 'rainstick', 'crystal', 'monochord', 'chimes']) }, { t: rng.int(90, 180), type: rng.pick(['crystal', 'fork', 'monochord', 'overtone', 'templeBell', 'belltree']) }],
       cue: 'Свободная атмосфера. Ведите голосом, добавляйте звуки вживую — пространство само медленно меняется.',

@@ -42,48 +42,12 @@ export class Generators {
   }
 
   tick(now, horizon, S, D) {
-    if (D.handpan > 0.02 && now >= this.next.handpan && now >= this.busyUntil.handpan) this.handpanPhrase(now, S, D.handpan);
+    // ханг импровизирует квадратами (improv.js): с ритмом — по его тактам, без ритма — в своём неслышном пульсе
+    this.app.improv.tick(now, horizon, S);
     if (D.wash > 0.02 && now >= this.next.wash) this.washNote(now, S, D.wash);
     if (D.bells > 0.02 && now >= this.next.bells) this.bells(now, S, D.bells);
     if (D.ocarina > 0.02 && now >= this.next.ocarina && now >= this.busyUntil.ocarina) this.ocarinaCall(now, S, D.ocarina);
     if (D.kalimba > 0.02 && now >= this.next.kalimba && now >= this.busyUntil.kalimba) this.kalimbaPhrase(now, S, D.kalimba);
-  }
-
-  // ---------- Ханг: фразы, привязанные к ритму, если он звучит ----------
-  handpanPhrase(now, S, d) {
-    const r = this.rng, E = this.E, notes = this.C.handpanNotes(), rh = this.app.rhythm;
-    const n = Math.round(r.range(3, 5 + d * 6));
-    const stable = notes.map((m, i) => (((m - notes[0]) % 12) === 0 || ((m - notes[0]) % 12) === 7 ? i : -1)).filter((i) => i >= 0);
-    let idx = r.pick([1, 2, 3, Math.min(4, notes.length - 1)]);
-    const seq = [];
-    for (let i = 0; i < n; i++) {
-      seq.push(idx);
-      const s = r.weighted([-2, -1, 1, 2, 'ding'], [1, 3.2, 3, 1, 0.8]);
-      if (s === 'ding') { seq.push(0); i++; idx = r.int(1, 3); }
-      else idx = clamp(idx + s, 1, notes.length - 1);
-    }
-    seq[seq.length - 1] = r.pick(stable);
-    const withRhythm = rh.active;
-    let t = withRhythm ? rh.nextBeat(now + 0.25) : now + 0.2;
-    const unit = withRhythm ? rh.beatDur() / 2 : r.range(0.32, 0.55);
-    // фразы приходят то слева, то справа и медленно плывут по дуге
-    this.hpSide = -(this.hpSide || 1);
-    const p0 = S.motion === 'still' ? polar(this.hpSide * r.range(15, 100), r.range(-8, 12), r.range(1.5, 2.3)) : this.pos(S, now, { front: true });
-    const em = E.spawn({ group: 'instr', pos: p0, send: 0.26, kind: 'handpan', label: 'ханг' });
-    const phraseLen = seq.length * unit * 2.2 + 3;
-    em.path(arc(p0, (S.motion === 'orbit' ? 60 : 30) * this.hpSide * -1 * r.range(0.6, 1.3), t, t + phraseLen, r.range(-5, 10)));
-    let end = t;
-    seq.forEach((ix, i) => {
-      const arch = Math.sin(Math.PI * (i + 0.5) / seq.length);
-      const vel = (0.38 + 0.32 * arch + (ix === 0 ? 0.1 : 0)) * r.range(0.85, 1.1) * (withRhythm ? 0.8 : 1);
-      end = Math.max(end, I.handpan(E, em.input, t, { freq: mtof(notes[ix]), vel, bright: 0.35 + d * 0.3 }));
-      em.flash(t, 0.4);
-      const k = withRhythm ? r.weighted([1, 2, 3, 4], [3, 4, 1.5, 1]) : r.weighted([1, 1.5, 2, 3], [3, 2, 2, 1]) * r.range(0.9, 1.15);
-      t += unit * k;
-    });
-    em.end = end; this.E.after(end, () => em.dispose());
-    this.busyUntil.handpan = t;
-    this.next.handpan = t + r.range(0.6, 1.6) * (1.2 + (1 - d) * 11);
   }
 
   // ---------- Облако: «атмосферный массив» из протяжных нот ханга ----------
@@ -104,7 +68,7 @@ export class Generators {
     const r = this.rng, E = this.E, C = this.C;
     // Колокольчики отвечают хангу: звучат в его паузах, на долю ритма и нотами аккорда — без спора с хангом
     const pool = this.bellPool(S).map(mtof);
-    const rh = this.app.rhythm;
+    const rh = this.app.clock;
     let t = Math.max(now + 0.1, this.busyUntil.handpan + r.range(0.3, 0.9));
     if (rh.active) t = rh.nextBeat(t);
     if (t > now + 6) { this.next.bells = now + 2; return; }
@@ -171,7 +135,7 @@ export class Generators {
     const em = E.spawn({ group: 'instr', pos: kp, send: 0.35, kind: 'kalimba', label: 'калимба' });
     em.path(arc(kp, r.sign() * r.range(25, 50), now, now + 5));
     let t = now + 0.15, i = r.int(0, pool.length - 4), end = t;
-    const n = r.int(4, 9), u = this.app.rhythm.active ? this.app.rhythm.beatDur() / 2 : r.range(0.18, 0.3);
+    const n = r.int(4, 9), u = this.app.clock.active ? this.app.clock.beatDur() / 2 : r.range(0.18, 0.3);
     for (let k = 0; k < n; k++) {
       end = Math.max(end, I.kalimba(E, em.input, t, { freq: mtof(pool[clamp(i, 0, pool.length - 1)]), vel: r.range(0.4, 0.75) }));
       em.flash(t, 0.3); t += u * r.pick([1, 1, 2]); i += r.weighted([-1, 1, 2, -2], [2, 3, 1, 1]);
@@ -179,6 +143,17 @@ export class Generators {
     em.end = end; E.after(end, () => em.dispose());
     this.busyUntil.kalimba = t;
     this.next.kalimba = t + r.range(0.6, 1.4) * (4 + (1 - d) * 25);
+  }
+
+  // ---------- Внимание в теле: тихий звон там, куда ведёт голос (йога-нидра) ----------
+  ping(spec, t) {
+    const E = this.E, C = this.C, r = this.rng;
+    const pos = polar(spec.az || 0, spec.el || 0, spec.d || 1.25);
+    const em = E.spawn({ group: 'instr', pos, send: 0.25, kind: 'bells', label: 'внимание' });
+    const pool = scaleInRange(C.state.tuning, C.ding, C.ding + 24, C.ding + 36, { pentatonic: true });
+    const end = spec.kind === 'bowl' ? I.bowl(E, em.input, t, { freq: mtof(C.ding + 12), vel: 0.35 })
+      : I.kalimba(E, em.input, t, { freq: mtof(r.pick(pool)), vel: 0.22 });
+    em.end = end; em.glow = 0.9; E.after(end, () => em.dispose());
   }
 
   // ---------- Сюжетные события ----------

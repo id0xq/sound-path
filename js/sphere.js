@@ -3,7 +3,7 @@
 //  • Поле — каждое мгновение звука как точка в полукруге: слева — левое ухо, справа — правое, дальше от центра — громче.
 //  • Лиссажу — форма стерео: светящаяся нить, которая дышит вместе со звуком.
 //  • Кристалл — спектр, собранный в шестилучевую снежинку: низы у центра, верха на кончиках лучей.
-//  • Хладни — песок на звучащей пластине: высота звука выбирает узор, песок собирается в узловых линиях.
+//  • Хладни — песок на звучащей пластине: у каждой ноты свой узор, песок собирается в её узловых линиях.
 import { toPolar, clamp } from './util.js';
 
 export const KIND_COLORS = {
@@ -267,50 +267,115 @@ export class Sphere {
     c.globalCompositeOperation = 'source-over';
   }
   // ---------- Пластина Хладни ----------
+  // У каждой ноты свой узор: чем выше нота, тем сложнее фигура (как у настоящей пластины, где высокие
+  // собственные частоты дают больше узловых линий). Ноты приходят прямо от инструментов, поэтому узор
+  // меняется точно в момент удара: песок подпрыгивает и собирается в линии новой ноты. Когда звучит
+  // аккорд, узоры смешиваются по громкости. Для голоса и живых звуков — высота из спектра.
   drawChladni() {
-    const c = this.ctx, E = this.app.E;
-    const MODES = [[1, 2], [1, 3], [2, 3], [1, 4], [3, 4], [2, 5], [1, 5], [3, 5], [4, 5], [2, 6], [1, 6], [5, 6], [3, 7], [2, 7], [4, 7], [6, 7], [5, 8], [3, 8]];
+    const c = this.ctx, E = this.app.E, now = E.now, P = Math.PI;
     if (!this.sand) {
-      this.sand = new Float32Array(12000 * 2);
+      const count = (navigator.hardwareConcurrency || 4) <= 4 ? 9000 : 15000;
+      this.sand = new Float32Array(count * 2);
       for (let i = 0; i < this.sand.length; i++) this.sand[i] = Math.random() * 2 - 1;
-      this.mode2 = [3, 5]; this.modeSign = -1; this.pend = null;
       this.fb = new Float32Array(E.anL.frequencyBinCount);
+      this.mix = new Map(); this.kick = 0; this.seen = 0; this.label = '';
+      // таблица узоров по возрастанию сложности (n² + m²), у каждой — два знака
+      const T = [];
+      for (let m = 1; m <= 13; m++) for (let n = 0; n < m; n++) T.push({ n, m, k: n * n + m * m });
+      T.sort((a, b) => a.k - b.k || a.n - b.n);
+      this.modes = []; T.forEach((t) => { this.modes.push({ ...t, s: -1 }); if (t.n > 0) this.modes.push({ ...t, s: 1 }); });
+      this.cosTab = []; this.sinTab = [];
+      for (let n = 0; n <= 13; n++) {
+        const a = new Float32Array(1025), b = new Float32Array(1025);
+        for (let i = 0; i <= 1024; i++) { a[i] = Math.cos(n * P * i / 1024); b[i] = -n * P * Math.sin(n * P * i / 1024); }
+        this.cosTab.push(a); this.sinTab.push(b);
+      }
+      this.lastKick = 0;
     }
-    // какая нота звучит сильнее всего → какой узор на пластине
-    E.anL.getFloatFrequencyData(this.fb);
-    const n = this.fb.length, hz = E.ctx.sampleRate / 2 / n;
-    let best = -200, bi = 0; for (let i = Math.floor(70 / hz); i < Math.floor(1800 / hz); i++) if (this.fb[i] > best) { best = this.fb[i]; bi = i; }
-    const energy = clamp((best + 80) / 45, 0, 1);
-    if (energy > 0.15) {
-      const f = bi * hz, idx = Math.floor((Math.log2(f / 70) * 4.2) % MODES.length);
-      const want = MODES[(idx + MODES.length) % MODES.length];
-      if (!this.pend || this.pend.m !== want) this.pend = { m: want, t: performance.now() };
-      else if (performance.now() - this.pend.t > 450 && want !== this.mode2) { this.mode2 = want; this.modeSign = Math.random() < 0.5 ? -1 : 1; }
+    const modeFor = (midi) => this.modes[clamp(Math.round(midi) - 33, 0, this.modes.length - 1)];
+
+    // какие ноты звучат сейчас и насколько громко
+    const act = [];
+    for (const n of E.notes) {
+      if (n.t > now + 0.02 || now - n.t > 8) continue;
+      const a = n.vel * Math.exp(-(now - n.t) / Math.min(1.1, Math.max(0.3, n.decay)));
+      if (a > 0.04) act.push({ midi: n.midi, a, t: n.t });
+      // песок подпрыгивает на удар, но не чаще, чем успевает лечь
+      if (n.t > this.seen && n.t <= now + 0.02 && now - this.lastKick > 0.28) { this.kick = Math.max(this.kick, 0.25 + n.vel * 0.45); this.lastKick = now; }
     }
-    const [a, b] = this.mode2, sg = this.modeSign, P = Math.PI;
-    const shake = this.reduced ? 0 : 0.012 + energy * 0.05;
-    const S = this.sand;
+    for (const n of E.notes) if (n.t <= now + 0.02) this.seen = Math.max(this.seen, n.t);
+    // одна и та же нота могла прозвучать несколько раз — складываем
+    const by = new Map(); for (const n of act) { const k = Math.round(n.midi); const p = by.get(k); by.set(k, p ? { ...p, a: Math.max(p.a, n.a) + 0.3 * Math.min(p.a, n.a) } : n); }
+    let top = [...by.values()].sort((x, y) => y.a - x.a).slice(0, 2);
+    let energy = clamp(top.reduce((s, n) => s + n.a, 0), 0, 1.2);
+    if (!top.length) {
+      // голос, живой звук, природа: высота из спектра
+      E.anL.getFloatFrequencyData(this.fb);
+      const len = this.fb.length, hz = E.ctx.sampleRate / 2 / len;
+      let best = -200, bi = 0; for (let i = Math.floor(70 / hz); i < Math.floor(1800 / hz); i++) if (this.fb[i] > best) { best = this.fb[i]; bi = i; }
+      energy = clamp((best + 80) / 45, 0, 1) * 0.8;
+      if (energy > 0.15 && bi) top = [{ midi: 69 + 12 * Math.log2((bi * hz) / 440), a: energy }];
+    }
+    // плавное перетекание узоров
+    const sum = top.reduce((s, n) => s + n.a * n.a, 0) || 1;
+    for (const v of this.mix.values()) v.target = 0;
+    top.forEach((n, i) => {
+      const md = modeFor(n.midi), key = md.n + ':' + md.m + ':' + md.s;
+      const v = this.mix.get(key) || { md, w: 0, midi: n.midi };
+      v.target = (n.a * n.a) / sum; v.midi = n.midi; this.mix.set(key, v);
+      if (i === 0) this.lead = v;
+    });
+    for (const [key, v] of this.mix) { v.w += (v.target - v.w) * (v.target > v.w ? 0.35 : 0.08); if (v.w < 0.01 && !v.target) this.mix.delete(key); }
+    if (!this.mix.size) { const md = modeFor(57); this.mix.set('idle', { md, w: 1, target: 1, midi: 57 }); }
+    const parts = [...this.mix.values()].sort((a, b) => b.w - a.w).slice(0, 2);
+
+    this.kick *= 0.86;
+    // Песок подпрыгивает там, где пластина дрожит, и соскальзывает туда, где она неподвижна (узловые линии)
+    const shake = this.reduced ? 0 : 0.004 + energy * 0.018 + this.kick * 0.05;
+    const S = this.sand, CT = this.cosTab, DT = this.sinTab;
+    const p0 = parts[0], p1 = parts[1];
+    // шаг скольжения подстроен под сложность узора: и простые, и сложные фигуры ложатся одинаково быстро
+    const kk = Math.max(1, p0.md.n * p0.md.n + p0.md.m * p0.md.m);
+    const slide = this.reduced ? 0 : (0.32 / (P * P * kk)) * (0.6 + energy) * (1 - Math.min(0.8, this.kick));
+    const a0 = CT[p0.md.n], b0 = CT[p0.md.m], da0 = DT[p0.md.n], db0 = DT[p0.md.m], s0 = p0.md.s, q0 = Math.max(0.35, p0.w * p0.w);
+    const a1 = p1 ? CT[p1.md.n] : null, b1 = p1 ? CT[p1.md.m] : null, s1 = p1 ? p1.md.s : 0, q1 = p1 ? p1.w * p1.w : 0;
     for (let i = 0; i < S.length; i += 2) {
-      const x = S[i], y = S[i + 1], X = (x + 1) / 2, Y = (y + 1) / 2;
-      const u = Math.cos(a * P * X) * Math.cos(b * P * Y) + sg * Math.cos(b * P * X) * Math.cos(a * P * Y);
-      const k = Math.abs(u) * shake;
-      let nx = x + (Math.random() - 0.5) * k * 2, ny = y + (Math.random() - 0.5) * k * 2;
+      const x = S[i], y = S[i + 1], xi = ((x + 1) * 512) | 0, yi = ((y + 1) * 512) | 0;
+      const ax = a0[xi], ay = a0[yi], bx = b0[xi], by = b0[yi];
+      const u0 = ax * by + s0 * bx * ay;
+      let A = q0 * u0 * u0;
+      let gx = q0 * u0 * (da0[xi] * by + s0 * db0[xi] * ay), gy = q0 * u0 * (ax * db0[yi] + s0 * bx * da0[yi]);
+      if (a1) {
+        const cx = a1[xi], cy = a1[yi], ex = b1[xi], ey = b1[yi], u1 = cx * ey + s1 * ex * cy;
+        // вторая нота только встряхивает песок: линии рисует ведущая, иначе песок соберётся в точки пересечений
+        A += 0.25 * q1 * u1 * u1;
+      }
+      const k = Math.sqrt(A) * shake;
+      let dx = (Math.random() - 0.5) * k * 2 - gx * slide, dy = (Math.random() - 0.5) * k * 2 - gy * slide;
+      if (dx > 0.04) dx = 0.04; else if (dx < -0.04) dx = -0.04;
+      if (dy > 0.04) dy = 0.04; else if (dy < -0.04) dy = -0.04;
+      let nx = x + dx, ny = y + dy;
       if (nx < -1) nx = -1 - (nx + 1); if (nx > 1) nx = 1 - (nx - 1); if (ny < -1) ny = -1 - (ny + 1); if (ny > 1) ny = 1 - (ny - 1);
       S[i] = nx; S[i + 1] = ny;
     }
     const { W, H, acc } = this.buffer();
-    for (let i = 0; i < acc.length; i++) acc[i] *= 0.55;
+    for (let i = 0; i < acc.length; i++) acc[i] *= 0.5;
     const side = Math.min(W, H) * 0.78, ox = (W - side) / 2, oy = (H - side) / 2, half = side / 2;
     for (let i = 0; i < S.length; i += 2) {
       const x = (ox + half + S[i] * half) | 0, y = (oy + half + S[i + 1] * half) | 0;
-      if (x >= 0 && x < W - 1 && y >= 0 && y < H - 1) { const j = y * W + x; acc[j] += 0.5; acc[j + 1] += 0.3; acc[j + W] += 0.3; acc[j + W + 1] += 0.2; }
+      if (x >= 0 && x < W - 1 && y >= 0 && y < H - 1) { const j = y * W + x; acc[j] += 0.55; acc[j + 1] += 0.25; acc[j + W] += 0.25; acc[j + W + 1] += 0.15; }
     }
     this.flush(hexRgb(mix(this.tint, '#e8f6ff', 0.6)), 1.2);
     c.save(); c.setTransform(1, 0, 0, 1, 0, 0);
-    c.strokeStyle = 'rgba(220,240,255,0.28)'; c.lineWidth = W / this.w;
+    c.strokeStyle = `rgba(220,240,255,${0.22 + this.kick * 0.3})`; c.lineWidth = W / this.w;
     c.strokeRect(ox - 2, oy - 2, side + 4, side + 4);
-    c.fillStyle = 'rgba(237,246,251,0.45)'; c.font = `${11 * W / this.w}px "Golos Text", system-ui`; c.textAlign = 'center';
-    c.fillText(`узор ${a}·${b}`, W / 2, oy + side + 22 * W / this.w);
+    const L = this.lead && this.lead.target ? this.lead : parts[0];
+    if (L && L.midi !== undefined) {
+      const SOLF = ['до', 'до♯', 'ре', 'ре♯', 'ми', 'фа', 'фа♯', 'соль', 'соль♯', 'ля', 'ля♯', 'си'];
+      const m = Math.round(L.midi); this.label = `${SOLF[((m % 12) + 12) % 12]} ${Math.floor(m / 12) - 1}  ·  узор ${L.md.n}·${L.md.m}`;
+    }
+    c.fillStyle = 'rgba(237,246,251,0.55)'; c.font = `${12 * W / this.w}px "Golos Text", system-ui`; c.textAlign = 'center';
+    c.fillText(this.label, W / 2, oy + side + 22 * W / this.w);
     c.restore();
   }
 

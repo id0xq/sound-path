@@ -1,5 +1,6 @@
 // Природа: ветер, листва, ручей (проплывает мимо при ходьбе), волны, дождь, сверчки, костёр — и птицы.
 import { polar, toPolar, clamp } from './util.js';
+import { curve, envCurve } from './fauna.js';
 
 const rnd = (a, b) => a + Math.random() * (b - a);
 const pick = (a) => a[Math.floor(Math.random() * a.length)];
@@ -197,95 +198,149 @@ export class Nature {
 }
 
 // ======================= ПТИЦЫ =======================
-// Каждая птица — своё место в пространстве, свой голос, паузы и перелёты.
+// Каждая птица — своё место в пространстве, свой голос, свои паузы, перелёты и позывки.
+// Голос строится из слогов с плавными изогнутыми свистами (как на сонограммах настоящих птиц),
+// с мягкой огибающей и слабыми обертонами сиринкса. Птицы перекликаются: соседи одного вида
+// не перебивают друг друга и часто отвечают похожей песней.
 export const BIRDS = {
-  robin: { name: 'Зарянка', pause: [3, 9] },
-  thrush: { name: 'Певчий дрозд', pause: [2, 6] },
-  tit: { name: 'Синица', pause: [5, 14] },
-  chaffinch: { name: 'Зяблик', pause: [5, 11] },
+  robin: { name: 'Зарянка', pause: [2.5, 7] },
+  thrush: { name: 'Певчий дрозд', pause: [1.5, 5] },
+  blackbird: { name: 'Чёрный дрозд', pause: [3, 7] },
+  tit: { name: 'Синица', pause: [4, 12] },
+  chaffinch: { name: 'Зяблик', pause: [5, 10] },
+  oriole: { name: 'Иволга', pause: [5, 12] },
+  wren: { name: 'Крапивник', pause: [6, 14] },
   cuckoo: { name: 'Кукушка', pause: [10, 25] },
   dove: { name: 'Горлица', pause: [8, 18] },
-  nightingale: { name: 'Соловей', pause: [2, 6] },
+  nightingale: { name: 'Соловей', pause: [1.5, 5] },
   distant: { name: 'Далёкий щебет', pause: [1, 5] },
 };
 
+let birdWave = null;
+function birdOsc(ctx, h = 0.09) {
+  const o = ctx.createOscillator();
+  if (!birdWave) birdWave = ctx.createPeriodicWave(new Float32Array([0, 0, 0, 0]), new Float32Array([0, 1, 0.09, 0.025]));
+  if (h > 0.02) o.setPeriodicWave(birdWave);
+  return o;
+}
+
+// s: { t, d, f: [точки высоты], a, att, rel, fm: [частота, глубина], vib, vr, h }
 function syllables(E, dest, t, list) {
   const ctx = E.ctx; let end = t;
   for (const s of list) {
-    const st = t + s.t, en = st + s.d;
-    const o = ctx.createOscillator(); o.type = s.type || 'sine';
-    const f = s.f;
-    o.frequency.setValueAtTime(f[0], st);
-    if (f.length === 2) o.frequency.exponentialRampToValueAtTime(f[1], en);
-    else if (f.length === 3) { o.frequency.exponentialRampToValueAtTime(f[1], st + s.d * 0.5); o.frequency.exponentialRampToValueAtTime(f[2], en); }
+    const st = t + s.t, d = Math.max(0.012, s.d), en = st + d;
+    const n = Math.max(8, Math.min(64, Math.round(d * 500)));
+    const o = birdOsc(ctx, s.h ?? 0.09);
+    o.frequency.setValueCurveAtTime(curve(s.f.length > 1 ? s.f : [s.f[0], s.f[0]], n, s.vib || 0, s.vr || 30, d), st, d);
     if (s.fm) { const m = ctx.createOscillator(); m.frequency.value = s.fm[0]; const md = ctx.createGain(); md.gain.value = s.fm[1]; m.connect(md); md.connect(o.frequency); m.start(st); m.stop(en + 0.02); }
-    const g = ctx.createGain(); g.gain.setValueAtTime(0, st);
-    const att = Math.min(s.att ?? 0.006, s.d * 0.4);
-    g.gain.linearRampToValueAtTime(s.a, st + att); g.gain.setValueAtTime(s.a, Math.max(st + att, en - Math.min(0.012, s.d * 0.3))); g.gain.linearRampToValueAtTime(0, en);
+    const g = ctx.createGain(); g.gain.value = 0;
+    g.gain.setValueCurveAtTime(envCurve(n, s.att ?? 0.18, s.rel ?? 0.35, s.a), st, d);
     o.connect(g); g.connect(dest); o.start(st); o.stop(en + 0.02);
-    if (s.h) {
-      const o2 = ctx.createOscillator(); o2.frequency.setValueAtTime(f[0] * 2, st);
-      if (f.length >= 2) o2.frequency.exponentialRampToValueAtTime(f[f.length - 1] * 2, en);
-      const g3 = ctx.createGain(); g3.gain.setValueAtTime(0, st); g3.gain.linearRampToValueAtTime(s.a * s.h, st + att); g3.gain.linearRampToValueAtTime(0, en);
-      o2.connect(g3); g3.connect(dest); o2.start(st); o2.stop(en + 0.02);
-    }
     end = Math.max(end, en);
   }
   return end;
 }
 
-// Генераторы фраз для каждого вида. k — индивидуальная высота голоса птицы.
+const R = rnd;
+const shapes = (f0, k = 1) => pick([
+  [f0, f0 * 1.35 * k],                 // подъём
+  [f0 * 1.3, f0],                      // спуск
+  [f0, f0 * 1.4, f0 * 1.05],           // шеврон
+  [f0 * 1.25, f0 * 0.9, f0 * 1.15],    // ямка
+  [f0, f0 * 1.05, f0 * 1.6],           // крючок вверх
+]);
+
+// Генераторы песен. b.k — индивидуальная высота голоса, b.tempo — темперамент птицы.
 const SONGS = {
   robin(b) {
-    const L = []; let tt = 0; const n = Math.floor(rnd(7, 14));
+    const L = []; let tt = 0; const k = b.k;
+    for (let i = 0; i < Math.floor(R(1, 3)); i++) { const f = R(5200, 7400) * k; L.push({ t: tt, d: R(0.12, 0.22), f: [f * 0.96, f, f * 0.98], a: 0.45, att: 0.3 }); tt += R(0.22, 0.32); }
+    const n = Math.floor(R(8, 16));
     for (let i = 0; i < n; i++) {
-      const r = Math.random();
-      if (r < 0.25) { for (let j = 0; j < 4; j++) { L.push({ t: tt, d: 0.022, f: [6200 * b.k, 5400 * b.k], a: 0.5 }); tt += 0.035; } }
-      else { const f0 = rnd(2600, 7200) * b.k, d = rnd(0.05, 0.16); L.push({ t: tt, d, f: [f0, f0 * rnd(0.7, 1.35)], a: rnd(0.4, 0.9), fm: Math.random() < 0.3 ? [rnd(40, 90), f0 * 0.05] : null }); tt += d + rnd(0.02, 0.08); }
+      const r = Math.random(), f0 = R(2800, 7600) * k;
+      if (r < 0.22) { const c = Math.floor(R(3, 6)); for (let j = 0; j < c; j++) { L.push({ t: tt, d: 0.024, f: [f0 * 1.15, f0 * 0.85], a: 0.5, att: 0.2, rel: 0.4 }); tt += 0.034; } }
+      else { const d = R(0.04, 0.13); L.push({ t: tt, d, f: shapes(f0), a: R(0.4, 0.85), fm: Math.random() < 0.25 ? [R(60, 120), f0 * 0.04] : null }); tt += d + R(0.015, 0.06); }
     }
     return L;
   },
   thrush(b) {
-    if (!b.motifs) b.motifs = Array.from({ length: 4 }, () => Array.from({ length: Math.floor(rnd(2, 4)) }, () => { const f0 = rnd(1800, 4600) * b.k; return { d: rnd(0.06, 0.16), f: [f0, f0 * rnd(0.75, 1.3)], fm: Math.random() < 0.25 ? [rnd(30, 60), f0 * 0.04] : null, gap: rnd(0.02, 0.07) }; }));
-    const m = pick(b.motifs), reps = Math.floor(rnd(2, 4)), L = []; let tt = 0;
-    for (let r = 0; r < reps; r++) { for (const s of m) { L.push({ t: tt, d: s.d, f: s.f, a: 0.7, fm: s.fm, h: 0.08 }); tt += s.d + s.gap; } tt += rnd(0.12, 0.22); }
+    if (!b.motifs) b.motifs = Array.from({ length: 6 }, () => Array.from({ length: Math.floor(R(2, 5)) }, () => { const f0 = R(1900, 4800) * b.k; return { d: R(0.05, 0.15), f: shapes(f0), fm: Math.random() < 0.2 ? [R(40, 80), f0 * 0.05] : null, gap: R(0.02, 0.06) }; }));
+    const m = pick(b.motifs), reps = Math.floor(R(2, 5)), L = []; let tt = 0;
+    for (let r = 0; r < reps; r++) { for (const s of m) { L.push({ t: tt, d: s.d, f: s.f, a: 0.7, fm: s.fm, h: 0.12 }); tt += s.d + s.gap; } tt += R(0.1, 0.2); }
+    return L;
+  },
+  // Чёрный дрозд: неторопливая флейта с плавными переходами и тихим щебетом в конце
+  blackbird(b) {
+    const L = []; let tt = 0; const k = b.k; let f = R(1500, 2300) * k;
+    const n = Math.floor(R(4, 8));
+    for (let i = 0; i < n; i++) {
+      const d = R(0.1, 0.32), nf = clamp(f * pick([0.84, 0.9, 1.06, 1.12, 1.19, 1.26]), 1250 * k, 3100 * k);
+      L.push({ t: tt, d, f: Math.random() < 0.5 ? [f, nf] : [f, f * 1.08, nf], a: R(0.55, 0.85), att: 0.22, rel: 0.4, h: 0.15, vib: Math.random() < 0.3 ? 0.01 : 0, vr: 18 });
+      tt += d + R(0.02, 0.09); f = nf;
+    }
+    const tw = Math.floor(R(2, 7));
+    for (let i = 0; i < tw; i++) { const f0 = R(4500, 7200) * k; L.push({ t: tt, d: R(0.025, 0.05), f: shapes(f0), a: 0.22 }); tt += R(0.035, 0.06); }
     return L;
   },
   tit(b) {
-    const L = []; let tt = 0; const n = Math.floor(rnd(3, 6)), hi = rnd(5800, 6800) * b.k, lo = hi * rnd(0.68, 0.78);
-    for (let i = 0; i < n; i++) { L.push({ t: tt, d: 0.07, f: [hi, hi * 0.96], a: 0.6 }); L.push({ t: tt + 0.1, d: 0.11, f: [lo * 1.04, lo], a: 0.75 }); tt += 0.27; }
+    const L = []; let tt = 0; const n = Math.floor(R(3, 7)), hi = R(5600, 6800) * b.k, lo = hi * R(0.66, 0.78);
+    for (let i = 0; i < n; i++) { L.push({ t: tt, d: 0.075, f: [hi * 1.02, hi, hi * 0.95], a: 0.55 }); L.push({ t: tt + 0.1, d: 0.12, f: [lo * 1.06, lo * 0.99, lo], a: 0.72 }); tt += R(0.25, 0.3); }
     return L;
   },
   chaffinch(b) {
-    const L = []; let tt = 0, f = 5200 * b.k;
-    for (let i = 0; i < 9; i++) { L.push({ t: tt, d: 0.045, f: [f, f * 0.85], a: 0.55 }); tt += 0.09 - i * 0.004; f *= 0.97; }
-    for (let i = 0; i < 6; i++) { L.push({ t: tt, d: 0.035, f: [f * 0.9, f * 0.72], a: 0.6 }); tt += 0.05; }
-    L.push({ t: tt + 0.04, d: 0.22, f: [3200 * b.k, 5600 * b.k, 2800 * b.k], a: 0.75 });
+    const L = []; let tt = 0, f = R(4800, 5600) * b.k;
+    for (let i = 0; i < 8; i++) { L.push({ t: tt, d: 0.05, f: [f * 1.05, f * 0.86], a: 0.5 + i * 0.02 }); tt += 0.095 - i * 0.004; f *= 0.97; }
+    for (let i = 0; i < 6; i++) { L.push({ t: tt, d: 0.036, f: [f * 0.95, f * 0.72], a: 0.6 }); tt += 0.05; }
+    L.push({ t: tt + 0.04, d: 0.24, f: [3000 * b.k, 5800 * b.k, 4200 * b.k, 2600 * b.k], a: 0.78, att: 0.1 });
+    return L;
+  },
+  // Иволга: «фиу-лиу» — сочная флейта
+  oriole(b) {
+    const L = []; let tt = 0; const f = R(1100, 1500) * b.k;
+    const pat = pick([[[1, 1.25, 0.16], [1.5, 1.2, 0.14], [1.1, 1.35, 0.3]], [[1.2, 1, 0.14], [1.3, 1.6, 0.18], [1.45, 1.1, 0.32]], [[1, 1.4, 0.2], [1.3, 1.05, 0.3]]]);
+    pat.forEach(([a, z, d]) => { L.push({ t: tt, d, f: [f * a, f * (a + z) / 2 * 1.04, f * z], a: 0.8, att: 0.15, rel: 0.4, h: 0.22 }); tt += d + 0.03; });
+    return L;
+  },
+  // Крапивник: громкая звонкая трель с переливами
+  wren(b) {
+    const L = []; let tt = 0; const parts = Math.floor(R(3, 6));
+    for (let p = 0; p < parts; p++) {
+      const f0 = R(4200, 7800) * b.k, c = Math.floor(R(6, 16)), gap = R(0.03, 0.06);
+      for (let i = 0; i < c; i++) { L.push({ t: tt, d: gap * 0.75, f: [f0 * 1.12, f0 * 0.88], a: 0.55, att: 0.15, rel: 0.4 }); tt += gap; }
+      tt += R(0.02, 0.08);
+    }
     return L;
   },
   cuckoo(b) {
-    const L = []; let tt = 0; const n = Math.floor(rnd(4, 8)), f1 = 690 * b.k, f2 = f1 * 0.81;
-    for (let i = 0; i < n; i++) { L.push({ t: tt, d: 0.17, f: [f1 * 1.02, f1], a: 0.85, att: 0.03, h: 0.1 }); L.push({ t: tt + 0.27, d: 0.3, f: [f2 * 1.01, f2 * 0.98], a: 0.7, att: 0.04, h: 0.1 }); tt += 0.95; }
+    const L = []; let tt = 0; const n = Math.floor(R(4, 9)), f1 = 690 * b.k, f2 = f1 * 0.81;
+    for (let i = 0; i < n; i++) { L.push({ t: tt, d: 0.18, f: [f1 * 1.03, f1, f1 * 0.99], a: 0.85, att: 0.25, rel: 0.4, h: 0.15 }); L.push({ t: tt + 0.27, d: 0.32, f: [f2 * 1.01, f2, f2 * 0.97], a: 0.7, att: 0.25, rel: 0.45, h: 0.15 }); tt += R(0.9, 1.0); }
     return L;
   },
   dove(b) {
     const L = []; let tt = 0; const f = 470 * b.k;
-    [[0.22, 1], [0.48, 1.06], [0.25, 0.97]].forEach(([d, r], i) => { L.push({ t: tt, d, f: [f * r * 0.96, f * r * 1.02, f * r * 0.94], a: 0.75, att: 0.05, fm: [rnd(8, 14), f * 0.02], h: 0.05 }); tt += d + (i === 0 ? 0.12 : 0.18); });
+    [[0.22, 1], [0.48, 1.06], [0.26, 0.97]].forEach(([d, r], i) => { L.push({ t: tt, d, f: [f * r * 0.95, f * r * 1.02, f * r * 0.93], a: 0.75, att: 0.3, rel: 0.4, vib: 0.02, vr: 11, h: 0.1 }); tt += d + (i === 0 ? 0.12 : 0.18); });
     return L;
   },
   nightingale(b) {
     const L = []; let tt = 0; const kind = Math.random();
-    if (kind < 0.4) { const f = rnd(1400, 2100) * b.k; for (let i = 0; i < 5; i++) { L.push({ t: tt, d: 0.32, f: [f, f * 1.02], a: 0.25 + i * 0.15, att: 0.12 }); tt += 0.42; } }
-    const tr = rnd(2800, 4200) * b.k; const n = Math.floor(rnd(14, 30));
-    for (let i = 0; i < n; i++) { L.push({ t: tt, d: 0.022, f: [tr * (i % 2 ? 1 : 0.8), tr * (i % 2 ? 0.7 : 1.1)], a: 0.7 }); tt += 0.032; }
-    if (Math.random() < 0.6) for (let i = 0; i < 3; i++) { L.push({ t: tt + 0.08, d: 0.012, f: [7000, 2500], a: 0.6 }); tt += 0.09; }
+    if (kind < 0.45) { const f = R(1400, 2100) * b.k; for (let i = 0; i < Math.floor(R(4, 7)); i++) { L.push({ t: tt, d: 0.3, f: [f, f * 1.02, f * 1.01], a: 0.2 + i * 0.12, att: 0.4, rel: 0.4, h: 0.12 }); tt += 0.4; } }
+    const tr = R(2800, 4200) * b.k, n = Math.floor(R(14, 34));
+    for (let i = 0; i < n; i++) { L.push({ t: tt, d: 0.022, f: i % 2 ? [tr * 1.05, tr * 0.7] : [tr * 0.8, tr * 1.1], a: 0.7, att: 0.15, rel: 0.4 }); tt += 0.031; }
+    if (Math.random() < 0.6) for (let i = 0; i < 3; i++) { L.push({ t: tt + 0.08, d: 0.014, f: [7200, 2600], a: 0.55 }); tt += 0.09; }
     return L;
   },
   distant(b) {
-    const L = []; let tt = 0; const n = Math.floor(rnd(1, 4));
-    for (let i = 0; i < n; i++) { const f0 = rnd(3000, 7000); L.push({ t: tt, d: rnd(0.03, 0.08), f: [f0, f0 * rnd(0.7, 1.3)], a: 0.5 }); tt += rnd(0.06, 0.2); }
+    const L = []; let tt = 0; const n = Math.floor(R(1, 4));
+    for (let i = 0; i < n; i++) { const f0 = R(3000, 7000); L.push({ t: tt, d: R(0.03, 0.09), f: shapes(f0), a: 0.5 }); tt += R(0.06, 0.2); }
     return L;
   },
+};
+// короткие позывки между песнями
+const CALLS = {
+  robin: (b) => [{ t: 0, d: 0.05, f: [8200 * b.k, 7600 * b.k], a: 0.3 }],
+  tit: (b) => [{ t: 0, d: 0.05, f: [7000, 6400], a: 0.3 }, { t: 0.09, d: 0.05, f: [7000, 6300], a: 0.25 }],
+  blackbird: (b) => [{ t: 0, d: 0.03, f: [2600, 1800], a: 0.4, h: 0.3 }, { t: 0.12, d: 0.03, f: [2600, 1800], a: 0.35, h: 0.3 }],
+  chaffinch: (b) => [{ t: 0, d: 0.06, f: [6200, 5600], a: 0.3 }],
 };
 
 export class Birds {
@@ -308,10 +363,19 @@ export class Birds {
       }
       if (now + 0.6 >= b.next) {
         const t = Math.max(now + 0.05, b.next);
-        if (Math.random() < 0.06 && b.sp !== 'cuckoo') { this.fly(b, t, S); b.next = t + 2.2; continue; }
+        const r = Math.random();
+        if (r < 0.05 && b.sp !== 'cuckoo') { this.fly(b, t, S); b.next = t + 2.2; continue; }
+        if (r < 0.13) { this.hop(b, t); }
+        if (r > 0.82 && CALLS[b.sp]) { const e = syllables(this.E, b.voice, t, CALLS[b.sp](b)); b.em.flash(t, e - t); b.next = e + rnd(0.6, 2); continue; }
         const end = syllables(this.E, b.voice, t, SONGS[b.sp](b));
         b.em.flash(t, end - t);
-        const [a, z] = BIRDS[b.sp].pause; b.next = end + rnd(a, z) * (1.3 - Math.min(1, S.birds || 0) * 0.5);
+        const [a, z] = BIRDS[b.sp].pause; b.next = end + rnd(a, z) * (1.3 - Math.min(1, S.birds || 0) * 0.5) * b.tempo;
+        // перекличка: соседи того же вида не перебивают и часто отвечают
+        for (const o of this.list) {
+          if (o === b || o.leaving) continue;
+          if (o.next < end + 0.3) o.next = end + rnd(0.3, 1.2);
+          if (o.sp === b.sp && Math.random() < 0.45) { o.next = end + rnd(0.35, 1.4); if (b.motifs && Math.random() < 0.5) o.motifs = b.motifs; }
+        }
       }
     }
   }
@@ -321,17 +385,22 @@ export class Birds {
     const az = S.motion === 'walk' ? rnd(-70, 70) : rnd(-170, 170);
     const pos = polar(az, far ? rnd(5, 20) : rnd(12, 55), far ? rnd(20, 40) : rnd(5, 16));
     const em = E.spawn({ group: 'birds', pos, send: far ? 0.55 : 0.3, kind: 'bird', label: BIRDS[sp].name });
-    const voice = E.ctx.createGain(); voice.gain.value = (far ? 0.26 : 0.14) * (sp === 'dove' ? 1.5 : 1);
-    const hp = E.ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = sp === 'dove' || sp === 'cuckoo' ? 200 : 1200;
+    const voice = E.ctx.createGain(); voice.gain.value = (far ? 0.26 : 0.14) * (sp === 'dove' ? 1.5 : sp === 'blackbird' || sp === 'oriole' ? 1.2 : 1);
+    const hp = E.ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = sp === 'dove' || sp === 'cuckoo' ? 200 : sp === 'blackbird' || sp === 'oriole' ? 700 : 1200;
     voice.connect(hp); hp.connect(em.input);
-    const b = { sp, em, voice, pos, k: rnd(0.9, 1.1), next: now + rnd(0.3, 3) };
+    const b = { sp, em, voice, pos, k: rnd(0.9, 1.1), tempo: rnd(0.85, 1.15), next: now + rnd(0.3, 3) };
     this.list.push(b);
     return b;
   }
 
+  // перепрыгнуть на соседнюю ветку
+  hop(b, t) {
+    const p = toPolar(b.pos), np = polar(p.az + rnd(-14, 14), clamp(p.el + rnd(-6, 6), 5, 70), p.d * rnd(0.92, 1.08));
+    this.wings(b.em.input, t, 0.18, 0.5);
+    b.em.path([{ t, pos: b.pos }, { t: t + 0.35, pos: np }]); b.pos = np;
+  }
   // перелёт: шорох крыльев и смена места
   fly(b, t, S) {
-    const E = this.E, ctx = E.ctx;
     const p = toPolar(b.pos), np = polar(p.az + rnd(-120, 120), rnd(15, 55), rnd(5, 14));
     this.wings(b.em.input, t, 0.7);
     b.em.path([{ t, pos: b.pos }, { t: t + 1.4, pos: np }]);

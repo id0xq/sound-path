@@ -3,6 +3,8 @@
 import { clamp, tuning } from './util.js';
 
 const rnd = (a, b) => a + Math.random() * (b - a);
+// сообщить пластине Хладни, какая нота звучит
+const note = (E, f, t, vel, decay) => E.noteOn && E.noteOn(69 + 12 * Math.log2(f / tuning.a4), t, vel, decay);
 
 function sine(ctx, f, t, end, type = 'sine') {
   const o = ctx.createOscillator(); o.type = type; o.frequency.setValueAtTime(f, t); o.start(t); o.stop(end); return o;
@@ -30,6 +32,7 @@ function grains(g, times, ampFn, tau = 0.004) {
 // ---------------- Ханг ----------------
 // Тон ханга: основной тон, октава и квинта через октаву, лёгкое биение «живого» металла.
 export function handpan(E, dest, t, { freq, vel = 0.7, bright = 0.5, bowed = false }) {
+  note(E, freq, t, vel, bowed ? 4 : 2.2);
   // настоящие записи ханга из Handpan Sphere, если загружены
   if (E.hp && E.hp.ready) return E.hp.play(dest, t, 69 + 12 * Math.log2(freq / tuning.a4), { vel, bright, bowed });
   const ctx = E.ctx;
@@ -63,7 +66,7 @@ export function handpan(E, dest, t, { freq, vel = 0.7, bright = 0.5, bowed = fal
 
 // ---------------- Колокольчики коши ----------------
 export function koshi(E, dest, t, { freq, vel = 0.6 }) {
-  const ctx = E.ctx, end = t + 6.5;
+  const ctx = E.ctx, end = t + 6.5; note(E, freq, t, vel * 0.6, 1.5);
   const o = out(E, dest, 0.1 * vel, end);
   [[1, 1, 6], [2.756, 0.45, 2.4], [5.404, 0.22, 1], [8.933, 0.1, 0.45]].forEach(([r, a, T]) => {
     const f = freq * r; if (f > 18000) return;
@@ -99,6 +102,7 @@ export function tingsha(E, dest, t, { freq = 2350, vel = 0.6 }) {
 // ---------------- Поющая чаша ----------------
 // mode: 'strike' — удар; 'sing' — ведение по краю (плавное нарастание и долгое пение)
 export function bowl(E, dest, t, { freq = 180, vel = 0.7, mode = 'strike', hold = 6 }) {
+  note(E, freq, t, vel, 6);
   const ctx = E.ctx;
   const sing = mode === 'sing';
   const end = t + (sing ? hold + 3 : 0) + 24;
@@ -126,6 +130,7 @@ export function bowl(E, dest, t, { freq = 180, vel = 0.7, mode = 'strike', hold 
 
 // ---------------- Гонг (мягкий, с «расцветом» верхних обертонов) ----------------
 export function gong(E, dest, t, { freq = 62, vel = 0.7 }) {
+  note(E, freq, t, vel, 8);
   const ctx = E.ctx, end = t + 24;
   const o = out(E, dest, 0.06 * vel, end);
   const lp = filt(ctx, 'lowpass', 900, 0.5); lp.connect(o);
@@ -146,6 +151,7 @@ export function gong(E, dest, t, { freq = 62, vel = 0.7 }) {
 // notes: [{f, d, v}] — частота, длительность, громкость. Фраза поётся легато одним дыханием.
 export function ocarina(E, dest, t, notes, { vel = 0.6, breath = 0.5 } = {}) {
   const ctx = E.ctx;
+  { let tt = t; for (const n of notes) { note(E, n.f, tt, vel * (n.v || 1), n.d + 0.3); tt += n.d; } }
   const total = notes.reduce((a, n) => a + n.d, 0), end = t + total + 0.7;
   const o = out(E, dest, 0.15 * vel, end);
   const lp = filt(ctx, 'lowpass', 4200, 0.5); lp.connect(o);
@@ -180,7 +186,7 @@ export function ocarina(E, dest, t, notes, { vel = 0.6, breath = 0.5 } = {}) {
 
 // ---------------- Калимба ----------------
 export function kalimba(E, dest, t, { freq, vel = 0.6 }) {
-  const ctx = E.ctx, low = clamp((600 - freq) / 400, 0, 1), end = t + 2.6 + low;
+  const ctx = E.ctx, low = clamp((600 - freq) / 400, 0, 1), end = t + 2.6 + low; note(E, freq, t, vel, 1.2);
   const o = out(E, dest, 0.18 * vel, end);
   [[1, 1, 1.6 + low * 1.2], [2, 0.05, 0.6], [5.93, 0.16, 0.18]].forEach(([r, a, T]) => {
     const osc = sine(ctx, freq * r, t, end), g = egain(ctx, t, a, 0.0015, T / 6.9);
@@ -317,6 +323,7 @@ const toneCache = new Map();
 
 // Хрустальная поющая чаша: почти чистый тон, медленное «ведение» по краю, плавающее биение
 export function crystalBowl(E, dest, t, { freq = 261.6, vel = 0.6, hold = 10 }) {
+  note(E, freq, t, vel, 8);
   const ctx = E.ctx, end = t + hold + 16;
   const o = out(E, dest, 0.14 * vel, end);
   const wob = ctx.createOscillator(); wob.frequency.value = rnd(0.9, 1.6);
@@ -334,6 +341,7 @@ export function crystalBowl(E, dest, t, { freq = 261.6, vel = 0.6, hold = 10 }) 
 
 // Камертон (по умолчанию «Ом», 136,1 Гц): мягкий удар и очень долгий чистый тон
 export function tuningFork(E, dest, t, { freq = 136.1, vel = 0.6 }) {
+  note(E, freq, t, vel, 6);
   const ctx = E.ctx, end = t + 22;
   const o = out(E, dest, 0.2 * vel, end);
   const osc = sine(ctx, freq, t, end), g = egain(ctx, t, 1, 0.02, 20 / 6.9); osc.connect(g); g.connect(o);
@@ -391,6 +399,7 @@ export function shruti(E, dest, t, { freq = 110, vel = 0.6, dur = 12 }) {
 
 // Храмовый колокол: глубокий гул и долгий звон
 export function templeBell(E, dest, t, { freq = 130, vel = 0.6 }) {
+  note(E, freq, t, vel, 8);
   const ctx = E.ctx, end = t + 20;
   const o = out(E, dest, 0.09 * vel, end);
   [[0.5, 0.7, 18], [1, 1, 12], [1.19, 0.45, 8], [1.5, 0.35, 7], [2, 0.5, 6], [2.51, 0.22, 4], [2.98, 0.15, 3], [4.16, 0.08, 2]].forEach(([r, a, T]) => {

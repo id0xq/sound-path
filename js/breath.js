@@ -68,7 +68,7 @@ function rep(list, n) { const out = []; for (let i = 0; i < n; i++) out.push(...
 
 export class Breathwork {
   constructor(app) {
-    this.app = app; this.E = app.E; this.active = null; this.opts = { beat: true, ticks: true, voice: false, tempo: 1 };
+    this.app = app; this.E = app.E; this.active = null; this.opts = { beat: true, ticks: true, voice: false, tempo: 1, sound: 'hang' };
     this.phases = []; this.handlers = {};
   }
   on(evt, fn) { (this.handlers[evt] ||= []).push(fn); }
@@ -131,6 +131,7 @@ export class Breathwork {
     ph.end = t; this.nextT = t;
     if (ph.gain) ph.gain.gain.setTargetAtTime(0, this.E.now, 0.5);
     if (ph.heart) ph.heart.gain.setTargetAtTime(0, this.E.now, 0.1);
+    if (ph.synthGain) ph.synthGain.gain.setTargetAtTime(0, this.E.now, 0.6);
   }
 
   current(now) { for (let i = this.phases.length - 1; i >= 0; i--) { const p = this.phases[i]; if (now >= p.t) return now < p.end ? p : null; } return null; }
@@ -183,6 +184,16 @@ export class Breathwork {
     E.setGroup('rhythm', { scene: 0.8 });
     const inten = ph && ph.intensity !== undefined ? ph.intensity : 0.8;
     const style = this.P.beat;
+    if (this.opts.sound !== 'hang' && style !== 'heart') {
+      const L = this.app.lib, d = rhythmEm.input;
+      if (style === 'pulse') { if (i % 2 === 0) L.hit(d, t, 'natural', 'kick', 0.55); rhythmEm.flash(t, 0.2); return; }
+      const b4 = i % 4;
+      if (b4 === 0 || b4 === 2) L.hit(d, t, 'edm', 'kick', (b4 === 0 ? 0.6 : 0.48) * inten, { lp: 5000 });
+      if (b4 === 1 || b4 === 3) L.hit(d, t, 'natural', 'clap', 0.38 * inten, { lp: 7000 });
+      if (inten > 0.45) L.hit(d, t + this.beat / 2, 'natural', 'hat', 0.32 * inten);
+      rhythmEm.flash(t, 0.2);
+      return;
+    }
     if (style === 'heart') { I.heart(E, rhythmEm.input, t, { hit: 'lub', vel: 0.45 }); I.heart(E, rhythmEm.input, t + this.beat * 0.28, { hit: 'dub', vel: 0.32 }); return; }
     if (style === 'pulse') { if (i % 2 === 0) I.frameDrum(E, rhythmEm.input, t, { hit: 'dum', vel: 0.3 }); return; }
     // drive: глубокий удар, ободок, шейкер на восьмых
@@ -203,6 +214,14 @@ export class Breathwork {
     const side = ph.kind.endsWith('L') ? -1 : ph.kind.endsWith('R') ? 1 : 0;
     const k = ph.kind;
     if (this.opts.voice && 'speechSynthesis' in window && k !== 'pump') this.say(SAY[k], t);
+    if (this.opts.sound !== 'hang') this.synthPhase(ph);
+    if (this.opts.sound === 'synth') {
+      if (this.opts.ticks && (k === 'hold' || k === 'rHold')) this.ticks(t, dur, polar(0, 60, 2.2));
+      if (this.opts.ticks && k === 'holdOut') this.ticks(t, dur, polar(0, -10, 2));
+      if (k === 'retention') E.dissolve(Math.min(dur, 30));
+      if (ph.cycle === 1 || k === 'rIn' || k === 'retention') this.emit('phase', ph);
+      return;
+    }
 
     if (k === 'in' || k === 'rIn' || k === 'inL' || k === 'inR' || k === 'in2') {
       ramp(1, t, dur);
@@ -263,6 +282,48 @@ export class Breathwork {
       if (this.resOn) { const V = this.app.voice; setTimeout(() => { V.set('resonance', this.resBefore || 0); this.resOn = false; }, Math.max(0, (t - E.now) * 1000)); }
     }
     if (ph.cycle === 1 || k === 'rIn' || k === 'retention') this.emit('phase', ph);
+  }
+
+  // Пэды и бас, как на драм-машине: вдох — пэд раскрывается и взлетает, бас идёт вверх (тоника → квинта);
+  // выдох — аккорд меняется, бас опускается; задержка — светлый пэд и флейта; пауза — глубокий саб.
+  synthPhase(ph) {
+    const A = this.app, L = A.lib, E = this.E, ctx = E.ctx, key = A.conductor.curDing, t = ph.t, dur = ph.dur, k = ph.kind;
+    const em = this.padEm || (this.padEm = E.spawn({ group: 'live', pos: polar(0, 20, 3.2), send: 0.45, kind: 'wash', label: 'пэд', atmos: 0.55 }));
+    const bem = this.bassEm || (this.bassEm = E.spawn({ group: 'live', pos: polar(0, -15, 2), send: 0.04, kind: 'rhythm', label: 'бас', hrtf: false, atmos: 0.02 }));
+    let base = key; while (base > 43) base -= 12; while (base < 31) base += 12;
+    const vol = this.opts.sound === 'mix' ? 0.7 : 1;
+    const side = k.endsWith('L') ? -1 : k.endsWith('R') ? 1 : 0;
+    if (k === 'in' || k === 'rIn' || k === 'inL' || k === 'inR' || k === 'in2') {
+      if (k === 'in2') { L.play(em.input, t, 'samplepad', key + 12, dur + 1, 0.35 * vol, { att: 0.2, rel: 1 }); return; }
+      this.cyc = (this.cyc || 0) + 1;
+      em.path([{ t, pos: polar(side * 60, -5, 3) }, { t: t + dur, pos: polar(side * 60, 55, 3) }]);
+      L.play(em.input, t, this.cyc % 2 ? 'samplepad' : 'mantra', key, dur + 1.2, 0.55 * vol, { att: Math.max(0.3, dur * 0.85), rel: 1.4, lp: 3400 });
+      L.play(bem.input, t, 'sub', base, dur * 0.5, 0.7 * vol, { att: 0.02, rel: 0.25, fold: false });
+      L.play(bem.input, t + dur * 0.5, 'sub', base + 7, dur * 0.5, 0.6 * vol, { att: 0.02, rel: 0.3, fold: false });
+    } else if (k === 'out' || k === 'outL' || k === 'outR' || k === 'hum') {
+      const alt = (this.cyc || 0) % 2 ? key + 8 : key + 5;
+      em.path([{ t, pos: polar(side * 60, 55, 3) }, { t: t + dur, pos: polar(side ? side * 80 : 170, -5, 3.4) }]);
+      L.play(em.input, t, (this.cyc || 0) % 2 ? 'soulsynth' : 'synthpad', alt, dur + 1.5, 0.5 * vol, { att: 0.6, rel: 1.6, lp: 2600 });
+      L.play(bem.input, t, 'sub', base + 7, dur * 0.4, 0.6 * vol, { att: 0.02, rel: 0.3, fold: false });
+      L.play(bem.input, t + dur * 0.4, 'sub', base, dur * 0.6, 0.65 * vol, { att: 0.02, rel: 0.5, fold: false });
+    } else if (k === 'hold' || k === 'rHold') {
+      L.play(em.input, t, 'samplepad', key, dur + 1, 0.42 * vol, { att: 0.8, rel: 1.5, lp: 4400 });
+      if (dur >= 3) {
+        let fl = key + 12; while (fl < 62) fl += 12; while (fl > 74) fl -= 12;
+        const fem = E.spawn({ group: 'live', pos: polar(0, 65, 3), send: 0.5, kind: 'ocarina', label: 'флейта', life: t + dur + 2 });
+        L.play(fem.input, t + 0.2, 'flute', fl, dur - 0.5, 0.3 * vol, { att: 0.5, rel: 0.8, fold: false });
+      }
+    } else if (k === 'holdOut' || k === 'retention') {
+      const g = ctx.createGain(); g.connect(em.input); const gb = ctx.createGain(); gb.connect(bem.input);
+      // при «Вдохнуть» в открытой задержке оба слоя мягко уходят
+      ph.synthGain = { gain: { setTargetAtTime: (v, at, tau) => { g.gain.setTargetAtTime(v, at, tau); gb.gain.setTargetAtTime(v, at, tau); } } };
+      L.play(gb, t, 'sub', base, dur, 0.4 * vol, { att: 1.5, rel: 2, fold: false });
+      L.play(g, t, 'mantra', key - 12, dur, 0.32 * vol, { att: 2, rel: 2, lp: 1200 });
+    } else if (k === 'pump') {
+      for (let tt = t, j = 0; tt < t + dur - 0.05; tt += this.beat, j++) if (j % 2 === 0) L.play(bem.input, tt, 'sub', base, this.beat * 0.45, 0.5 * vol, { att: 0.005, rel: 0.08, fold: false });
+    } else if (k === 'rest') {
+      L.play(em.input, t, 'samplepad', key, Math.min(dur, 20), 0.35 * vol, { att: 3, rel: 3, lp: 3000 });
+    }
   }
 
   ticks(t, dur, pos) {

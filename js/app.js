@@ -12,6 +12,10 @@ import { Live } from './live.js';
 import { HandpanSamples } from './samples.js';
 import { Narrator } from './narrator.js';
 import { HeadTracker } from './headtrack.js';
+import { SampleLib } from './sampler.js';
+import { Groove } from './groove.js';
+import { Improv } from './improv.js';
+import { Fauna } from './fauna.js';
 
 export class App {
   async init(onProgress) {
@@ -25,6 +29,10 @@ export class App {
     this.conductor = new Conductor(this);
     this.breath = new Breath(E, () => (this.conductor.pad ? [this.conductor.pad.breath.gain] : []));
     this.rhythm = new Rhythm(this);
+    this.lib = new SampleLib(E);
+    this.groove = new Groove(this);
+    this.improv = new Improv(this);
+    this.fauna = new Fauna(this);
     this.gen = new Generators(this);
     this.voice = new Voice(E);
     this.narrator = new Narrator(this);
@@ -34,6 +42,7 @@ export class App {
     E.setSpaceLevel({ user: 1, scene: 0.55 });
     await Promise.race([loading, new Promise((r) => setTimeout(r, 6000))]);
     await this.narrator.init();
+    this.lib.loadAll();   // киты, пэды, бас и флейта — в фоне, меньше мегабайта
 
     // Ведущий читает реплику, когда сюжет до неё доходит
     this.conductor.on('line', ({ idx, speak }) => {
@@ -48,6 +57,8 @@ export class App {
     this.worker.postMessage(40);
     return this;
   }
+  // общий такт для мелодий: грув, если звучит, иначе медитативный ритм
+  get clock() { return this.groove.active ? this.groove : this.rhythm; }
   tick() {
     const E = this.E; if (E.ctx.state !== 'running') return;
     const now = E.now;

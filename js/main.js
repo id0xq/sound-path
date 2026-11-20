@@ -1,6 +1,7 @@
 // Интерфейс: связывает кнопки, купол, ханг и панели с аудиодвижком.
 import { App } from './app.js';
 import { SETS } from './sets.js';
+import { motionAvailable } from './headtrack.js';
 import { SPACES } from './dsp.js';
 import { TUNINGS } from './theory.js';
 import { LIVE } from './live.js';
@@ -24,9 +25,16 @@ const store = {
 
 $('#enter').addEventListener('click', async () => {
   const btn = $('#enter'); btn.disabled = true; btn.textContent = 'Открываю пространство…';
+  // датчики поворота: iPhone спрашивает разрешение только прямо в ответ на нажатие
+  let motion = null;
+  if (motionAvailable() && store.get('headAuto', true)) {
+    const D = window.DeviceOrientationEvent;
+    motion = typeof D.requestPermission === 'function' ? D.requestPermission().then((r) => r === 'granted').catch(() => false) : Promise.resolve(true);
+  }
   try {
     $('#gateProgress').hidden = false;
     await app.init((k) => { $('#gateProgress div').style.width = Math.round(k * 100) + '%'; });
+    if (motion) { app.head.permission = motion; app.head.startGyro().catch(() => {}); }
     await app.E.ctx.resume();
     boot();
     $('#gate').classList.add('hide');
@@ -86,8 +94,10 @@ function buildSpaces() {
 // ---------- Сеты ----------
 function buildSets() {
   const box = $('#setPicker'); box.innerHTML = '';
-  const all = [...SETS, { id: 'free', title: 'Свободная атмосфера', subtitle: 'Бесконечный поток, каждый раз новый', minutes: 0 }];
+  const all = [...SETS, { id: 'free', group: 'Свободно', title: 'Свободная атмосфера', subtitle: 'Бесконечный поток, каждый раз новый', minutes: 0 }];
+  let group = null;
   for (const s of all) {
+    if (s.group && s.group !== group) { group = s.group; const h = document.createElement('h4'); h.className = 'set-group'; h.textContent = group; box.appendChild(h); }
     const b = document.createElement('button');
     b.className = 'set-opt'; b.dataset.id = s.id; b.setAttribute('role', 'radio'); b.setAttribute('aria-checked', String(s.id === setId));
     b.innerHTML = `<span class="t"></span><span class="m"></span><span class="s"></span>`;
@@ -307,8 +317,8 @@ function buildMixer() {
   const E = app.E, box = $('#faders');
   const saved = store.get('mix', {});
   const rows = [
-    ['atmos', 'Атмосфера', 1], ['nature', 'Природа', 1], ['birds', 'Птицы', 1], ['instr', 'Инструменты сюжета', 1],
-    ['rhythm', 'Ритм', 1], ['live', 'Живые звуки', 1], ['space', 'Пространство', 1], ['atmosTail', 'Атмосферный хвост', 1],
+    ['atmos', 'Атмосфера', 1], ['nature', 'Природа', 1], ['birds', 'Птицы и животные', 1], ['instr', 'Инструменты сюжета', 1],
+    ['rhythm', 'Ритм', 1], ['groove', 'Грув: барабаны, бас, клавиши', 1], ['live', 'Живые звуки', 1], ['space', 'Пространство', 1], ['atmosTail', 'Атмосферный хвост', 1],
     ['narrator', 'Голос ведущего', 1], ['binaural', 'Бинауральный тон', 0.5], ['resonance', 'Резонанс мира', 1],
   ];
   for (const [k, name, def] of rows) {
@@ -514,24 +524,18 @@ function renderOwnLines() {
 
 // ---------- Поворот головы ----------
 function bindHead() {
-  const H = app.head;
+  const H = app.head, box = $('#headAuto'), note = $('#headNote');
   app.onHead = () => {};
-  $$('#headMode button').forEach((b) => b.addEventListener('click', async () => {
-    const mode = b.dataset.head, hint = $('#placeHint');
-    try {
-      if (mode === 'off') H.stop();
-      else if (mode === 'camera') { hint.textContent = 'Включаю камеру и загружаю распознавание лица…'; $('#camPreview').hidden = false; await H.startCamera($('#camPreview')); hint.textContent = 'Поворачивайте голову — звуки останутся на своих местах. Камера остаётся на этом устройстве.'; }
-      else { await H.startGyro(); hint.textContent = 'Держите телефон перед собой и поворачивайтесь — сцена останется на месте.'; }
-      $$('#headMode button').forEach((x) => x.setAttribute('aria-checked', String(x === b)));
-      $('#recenter').hidden = mode === 'off';
-      if (mode !== 'camera') $('#camPreview').hidden = true;
-    } catch (e) {
-      H.stop(); $('#camPreview').hidden = true;
-      $$('#headMode button').forEach((x) => x.setAttribute('aria-checked', String(x.dataset.head === 'off')));
-      hint.textContent = 'Не получилось: ' + e.message;
-    }
-  }));
-  $('#recenter').addEventListener('click', () => H.recenter());
+  const can = motionAvailable();
+  box.checked = can && store.get('headAuto', true);
+  note.textContent = can ? 'Включается сам на телефоне. «Вперёд» мягко подстраивается под направление, куда вы идёте.'
+    : 'Работает на телефоне и планшете: там включается сам. Датчики наушников браузер сайтам не передаёт.';
+  box.disabled = !can;
+  box.addEventListener('change', async () => {
+    store.set('headAuto', box.checked);
+    if (!box.checked) { H.stop(); return; }
+    try { await H.startGyro(); } catch (e) { box.checked = false; note.textContent = 'Не получилось: ' + e.message; }
+  });
 }
 
 // ---------- Виды визуализации ----------
@@ -552,7 +556,15 @@ function bindTabs() {
 
 // ---------- Дыхательные практики ----------
 let breathId = 'coherence', vizBefore = 'dome';
+let bwSound = 'hang';
 function bindBreath() {
+  bwSound = store.get('bwSound', 'hang');
+  $$('#bwSound button').forEach((btn) => btn.addEventListener('click', () => {
+    bwSound = btn.dataset.sound; store.set('bwSound', bwSound);
+    $$('#bwSound button').forEach((x) => x.setAttribute('aria-checked', String(x === btn)));
+    if (app.breathwork) app.breathwork.opts.sound = bwSound;
+  }));
+  $$('#bwSound button').forEach((x) => x.setAttribute('aria-checked', String(x.dataset.sound === bwSound)));
   const B = app.breathwork, list = $('#breathList');
   const render = () => {
     list.innerHTML = '';
@@ -580,7 +592,7 @@ function bindBreath() {
   $('#breathTempo').addEventListener('input', (e) => { $('#breathTempoOut').value = Math.round(e.target.value * 100) + '%'; });
   $('#bwStart').addEventListener('click', async () => {
     await app.E.ctx.resume();
-    B.opts = { beat: $('#bwBeat').checked, ticks: $('#bwTicks').checked, voice: $('#bwVoice').checked, tempo: Number($('#breathTempo').value) };
+    B.opts = { beat: $('#bwBeat').checked, ticks: $('#bwTicks').checked, voice: $('#bwVoice').checked, tempo: Number($('#breathTempo').value), sound: bwSound };
     vizBefore = sphere.mode === 'breath' ? vizBefore : sphere.mode;
     B.start(breathId, { minutes: Number($('#breathLen').value) });
     sphere.setMode('breath');

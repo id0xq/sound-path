@@ -9,6 +9,7 @@ function merge(base, ch) {
   const S = { ...base, ...ch };
   S.nature = { ...base.nature, ...(ch.nature || {}) };
   S.pad = { ...base.pad, ...(ch.pad || {}) };
+  S.fauna = { ...(base.fauna || {}), ...(ch.fauna || {}) };
   return S;
 }
 
@@ -43,7 +44,7 @@ export class Conductor {
     this.elapsed = 0; this.chapterIdx = -1;
     // все реплики ведущего на общей шкале времени
     this.lines = [];
-    this.set.chapters.forEach((ch, ci) => (ch.script || []).forEach(([t, text], li) => this.lines.push({ at: ch.at + t, text, ci, li, key: `c${ci}l${li}` })));
+    this.set.chapters.forEach((ch, ci) => (ch.script || []).forEach(([t, text, ping], li) => this.lines.push({ at: ch.at + t, text, ci, li, key: `c${ci}l${li}`, ping })));
     this.lineIdx = -1; this.viewIdx = null;
     this.emit('load', this.set);
     this.emit('line', { idx: -1 });
@@ -73,7 +74,7 @@ export class Conductor {
     this.running = true; this.held = false; this.fadingOut = false; this.lastNow = now;
     E.musicSum.gain.cancelScheduledValues(now);
     E.musicSum.gain.setValueAtTime(0, now); E.musicSum.gain.linearRampToValueAtTime(1, now + 6);
-    this.app.gen.reset(now);
+    this.app.gen.reset(now); this.app.improv.reset();
     this.applyChapter(this.chapterIndexAt(this.elapsed), 3, true);
     this.emit('state');
   }
@@ -101,7 +102,7 @@ export class Conductor {
     A.nature.setLevels({}, 0.2);
     if (this.pad) { this.pad.dispose(0.5); this.pad = null; }
     A.tanpura.setLevel(0, 0.2); A.binaural.set({ scene: 0, tau: 0.5 }); A.breath.setRate(0);
-    A.birds.clear();
+    A.birds.clear(); A.fauna.clear(); A.groove.stop(); A.improv.reset(); this.E.setUnderwater(0, 1);
     for (const k of Object.keys(this.T)) { this.T[k] = 0; this.D[k] = 0; }
     this.chapterIdx = -1;
   }
@@ -144,9 +145,19 @@ export class Conductor {
     A.binaural.set({ carrier: mtof(ding), beat: S.binaural || 0, scene: S.binaural ? 1 : 0, tau: fade });
     A.breath.setRate(S.breath);
 
+    // жанровый грув (lo-fi, соул-джаз, фанк, хип-хоп, эмбиент-пульс) заменяет медитативный ритм
+    if (S.groove && S.groove.style) {
+      A.groove.set(S.groove, fade);
+      E.setGroup('groove', { scene: S.grooveLevel ?? 0.8, tau: A.groove.active ? fade / 4 : 1 });
+    } else if (A.groove.active) {
+      A.groove.set(null, fade); E.setGroup('groove', { scene: 0, tau: fade / 4 });
+    }
+    A.fauna.setLevels(S.fauna || {}, fade);
+    E.setUnderwater(S.underwater || 0, immediate ? 1 : fade);
+
     const rh = A.rhythm;
     this._rhythmOffAt = 0;
-    if (S.rhythm) {
+    if (S.rhythm && !(S.groove && S.groove.style)) {
       const wasActive = rh.active && rh.key;
       rh.setPattern(S.rhythm);
       rh.setTempo(S.tempo * this.tempoFactor, wasActive ? fade : 0.01);
@@ -193,6 +204,8 @@ export class Conductor {
         const natural = li === this.lineIdx + 1;
         this.lineIdx = li; this.viewIdx = null;
         this.emit('line', { idx: li, speak: natural });
+        const L = this.lines[li];
+        if (natural && L && L.ping) A.gen.ping(L.ping, now + 0.05);
       }
       for (const ev of this.pendingEvents) {
         if (!ev.done && this.elapsed >= ev.at - 0.4) { ev.done = true; A.gen.fire(ev.type, now + Math.max(0.05, ev.at - this.elapsed), this.state); }
@@ -214,6 +227,8 @@ export class Conductor {
     A.tanpura.tick(now, horizon);
     A.breath.tick(now, horizon);
     A.rhythm.tick(now, horizon);
+    A.groove.tick(now, horizon);
+    A.fauna.tick(now, horizon, S);
     A.nature.tick(now, horizon, S);
     A.birds.tick(now, horizon, { ...S, birds: this.D.birds });
     if (this.running) A.gen.tick(now, horizon, S, this.D);
