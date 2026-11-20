@@ -16,6 +16,7 @@ import { SampleLib } from './sampler.js';
 import { Groove } from './groove.js';
 import { Improv } from './improv.js';
 import { Fauna } from './fauna.js';
+import { Field } from './field.js';
 
 export class App {
   async init(onProgress) {
@@ -33,6 +34,7 @@ export class App {
     this.groove = new Groove(this);
     this.improv = new Improv(this);
     this.fauna = new Fauna(this);
+    this.field = new Field(this); this.birds.field = this.field;
     this.gen = new Generators(this);
     this.voice = new Voice(E);
     this.narrator = new Narrator(this);
@@ -43,6 +45,7 @@ export class App {
     await Promise.race([loading, new Promise((r) => setTimeout(r, 6000))]);
     await this.narrator.init();
     this.lib.loadAll();   // киты, пэды, бас и флейта — в фоне, меньше мегабайта
+    await Promise.race([this.field.init(), new Promise((r) => setTimeout(r, 2500))]);   // карта живых записей (сами записи грузятся по мере надобности)
 
     // Ведущий читает реплику, когда сюжет до неё доходит
     this.conductor.on('line', ({ idx, speak }) => {

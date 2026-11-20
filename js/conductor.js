@@ -99,7 +99,7 @@ export class Conductor {
   silenceAll() {
     const A = this.app;
     A.rhythm.setPattern(null); A.rhythm.pattern = null; A.rhythm.pending = undefined;
-    A.nature.setLevels({}, 0.2);
+    A.nature.setLevels({}, 0.2); A.field.applyNature({}, {}, 0.6);
     if (this.pad) { this.pad.dispose(0.5); this.pad = null; }
     A.tanpura.setLevel(0, 0.2); A.binaural.set({ scene: 0, tau: 0.5 }); A.breath.setRate(0);
     A.birds.clear(); A.fauna.clear(); A.groove.stop(); A.improv.reset(); this.E.setUnderwater(0, 1);
@@ -132,7 +132,7 @@ export class Conductor {
     const ding = (this.curDing = this.ding + (S.root || 0));
     E.setSpace(S.space, immediate ? 1 : Math.min(fade, 10));
     E.setSpaceLevel({ scene: S.spaceMix, tau: fade / 3 });
-    A.nature.setLevels(S.nature, fade / 3);
+    A.field.applyNature(S.nature, S, fade);
 
     const chord = S.chord.map((i) => ding + i);
     if (!this.pad || this.pad.timbre !== S.pad.timbre) {

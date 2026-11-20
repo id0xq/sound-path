@@ -23,7 +23,7 @@ python3 serve.py
 
 ## Как провести сет
 
-Нажмите «Начать сет». Реплики проводника показываются на экране как телесуфлёр: они сменяются сами по ходу сюжета, их можно листать кнопками «Назад» и «Дальше» или стрелками на клавиатуре. Нажатие на счётчик возвращает к сюжету.
+Нажмите «Начать сет». «Пауза» замораживает всё — звук, сюжет и дыхание; «Продолжить» ведёт дальше с того же места. Пауза работает и пробелом, и кнопками наушников или экрана блокировки, а «следующая / предыдущая» на них листают главы. Реплики проводника показываются на экране как телесуфлёр: они сменяются сами по ходу сюжета, их можно листать кнопками «Назад» и «Дальше» или стрелками на клавиатуре. Нажатие на счётчик возвращает к сюжету.
 
 Кнопка «Медитация с голосом» (ведущий сам читает реплики) пока скрыта — появится, когда будет готова озвучка ElevenLabs.
 
@@ -104,6 +104,20 @@ python3 serve.py
    Файлы лягут в `voice/`. После `git push` голос появится и в онлайн-версии.
 3. **Голос устройства.** Работает сразу. Самые естественные голоса — в браузере Edge (Svetlana Online Natural) и на iPhone с загруженной «Миленой (улучшенный)»: Настройки → Универсальный доступ → Устный контент → Голоса → Русский. Этот голос не попадает в запись сессии.
 
+## Живые записи
+
+Пространство собрано из настоящих звуков природы.
+
+- **Киты** — настоящие песни горбачей с подводных гидрофонов, из проекта [Ocean Song](https://oceansong.live): NOAA SanctSound (Гавайи, 2019, общественное достояние) и MBARI MARS (залив Монтерей, 2017, CC BY 4.0). Шум гидрофона убран, песня звучит фразами по порядку, как поёт кит, и медленно проплывает внизу. Под водой глохнет мир сверху, а кит остаётся ясным.
+- **Фоны** — утренний хор птиц, роща, летний луг, ветер в деревьях, ручей, дождь в лесу и в городе, волны, вода вокруг под водой, пещера с каплями, сверчки, хор лягушек, цикады, костёр, мурлычущий кот. Каждый фон звучит из четырёх точек вокруг вас и остаётся на месте, когда вы поворачиваете голову.
+- **Голоса** — чёрный дрозд, певчий дрозд, зарянка, соловей, зяблик, кукушка, горлица, иволга, крапивник, неясыть, волки, гагара, чайки, дятел, шмель и дельфины. Каждая птица поёт настоящими фразами из своего места в пространстве; соседи перекликаются.
+
+Записи загружаются по мере надобности и остаются в памяти телефона для работы без сети.
+
+## Фоновая работа
+
+На компьютере и Android звук продолжает идти в свёрнутой вкладке. На iPhone Safari останавливает веб-звук при блокировке экрана, поэтому приложение просит экран не гаснуть; полноценная работа с заблокированным экраном будет в версии для App Store.
+
 ## Звук
 
 **Пространство как в Valhalla.** Два ревербератора на сети из 16 задержек с обратной связью:
@@ -165,6 +179,8 @@ WAV без потерь (около 11 МБ в минуту) или сжатый
 - `js/improv.js` — импровизация ханга квадратами
 - `js/sampler.js` — киты и инструменты на сэмплах
 - `js/fauna.js` — животные
+- `js/field.js` — живые записи: фоны из четырёх точек и голоса птиц и зверей
+- `samples/field/` — записи природы и песни китов, карта фраз — `field.json`
 - `js/stories.js` — йога-нидра, киты, ночной лес, жанровые приключения
 - `js/sets.js`, `js/conductor.js` — сюжеты и их ведение
 - `js/instruments.js`, `js/nature.js`, `js/atmos.js`, `js/rhythm.js`, `js/generators.js`, `js/live.js` — звуки
@@ -178,3 +194,42 @@ WAV без потерь (около 11 МБ в минуту) или сжатый
 - Пэды, электропиано, соул-аккорд, винтажный синт, саб-бас и флейта — сэмплы, которые прислал автор проекта.
 
 Нарезка китов и корни аккордов — в `samples/lib.json`.
+
+### Авторы записей
+
+- Киты: Ocean Song (oceansong.live) — NOAA SanctSound, Hawaiian Islands Humpback Whale NMS (public domain); MBARI MARS Cabled Observatory (CC BY 4.0).
+- Записи природы с Freesound, лицензия CC0:
+  - Dawn Chorus Birdsong — squashy555, https://freesound.org/people/squashy555/sounds/573080/
+  - Numerous birds in Essex Woodland.WAV — jackmichaelking, https://freesound.org/people/jackmichaelking/sounds/518671/
+  - The sound of a babbling brook — hoshisato, https://freesound.org/people/hoshisato/sounds/853672/
+  - Babbling Brook — mycompasstv, https://freesound.org/people/mycompasstv/sounds/474288/
+  - Light Rain on Woodland Floor and Running Stream.wav — thinkingfish, https://freesound.org/people/thinkingfish/sounds/695571/
+  - rain_night_city_ambience.mp3 — thoefler, https://freesound.org/people/thoefler/sounds/205956/
+  - Calm ocean waves — SamsterBirdies, https://freesound.org/people/SamsterBirdies/sounds/578524/
+  - Underwater Ambience — Fission9, https://freesound.org/people/Fission9/sounds/504641/
+  - wind forest through trees around mic in waves cool movement.flac — kyles, https://freesound.org/people/kyles/sounds/637989/
+  - Crickets At Night - Raw sound — Defelozedd94, https://freesound.org/people/Defelozedd94/sounds/522299/
+  - Toads and frogs are singing at night in the pond, in the center of the small village of Diafarabe, on the Niger river. (Africa, Mali) — felix.blume, https://freesound.org/people/felix.blume/sounds/135561/
+  - Campfire 01 — HECKFRICKER, https://freesound.org/people/HECKFRICKER/sounds/729395/
+  - cicadas.wav — laughatlantic, https://freesound.org/people/laughatlantic/sounds/320113/
+  - SND_CatPurring_Loop_01.wav — megrez7274, https://freesound.org/people/megrez7274/sounds/508688/
+  - Water Dripping in Cave.wav — Sclolex, https://freesound.org/people/Sclolex/sounds/177958/
+  - Meadow with many insects chirps atmo field recording — Garuda1982, https://freesound.org/people/Garuda1982/sounds/529573/
+  - Blackbird (isolated) — richwise, https://freesound.org/people/richwise/sounds/811988/
+  - Blackbird song, solo, Good quality, Forest South of France — Sacha.Julien, https://freesound.org/people/Sacha.Julien/sounds/725332/
+  - Song Thrush — richwise, https://freesound.org/people/richwise/sounds/795708/
+  - ROBIN SONG.mp3 — tubbers, https://freesound.org/people/tubbers/sounds/276560/
+  - song of the nightingale — Garuda1982, https://freesound.org/people/Garuda1982/sounds/852708/
+  - Chaffinch (ziablik) — urupin, https://freesound.org/people/urupin/sounds/122618/
+  - Cuckoo.wav — bratendu, https://freesound.org/people/bratendu/sounds/506675/
+  - Eurasian Collared Dove — randomthoughts7, https://freesound.org/people/randomthoughts7/sounds/610563/
+  - Eurasian golden oriole - bird — Sadiquecat, https://freesound.org/people/Sadiquecat/sounds/737205/
+  - The song of an Eurasian Wren — hoshisato, https://freesound.org/people/hoshisato/sounds/853671/
+  - Tawny owl hooting — Patrick_Corra, https://freesound.org/people/Patrick_Corra/sounds/745208/
+  - Cooper Creek 20160313_014852 solitary wolf howl very clear.wav — betchkal, https://freesound.org/people/betchkal/sounds/500646/
+  - wolfs.wav — ondrosik, https://freesound.org/people/ondrosik/sounds/143568/
+  - Late Summer Loons — itinerantmonk108, https://freesound.org/people/itinerantmonk108/sounds/751848/
+  - shoreline_waves_seagulls.wav — mannhawks, https://freesound.org/people/mannhawks/sounds/162743/
+  - CourtshipDrummingOfWoodpecker.wav — JKata, https://freesound.org/people/JKata/sounds/620236/
+  - Single bumblebee.WAV — VMan533, https://freesound.org/people/VMan533/sounds/575899/
+  - Dolphin screaming underwater in Caribbean Sea (Mexico) — felix.blume, https://freesound.org/people/felix.blume/sounds/161691/

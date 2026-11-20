@@ -8,6 +8,9 @@ const rnd = (a, b) => a + Math.random() * (b - a);
 const pick = (a) => a[Math.floor(Math.random() * a.length)];
 const sgn = () => (Math.random() < 0.5 ? -1 : 1);
 
+// живые записи: киты — Ocean Song (NOAA SanctSound, MBARI MARS), остальные — Freesound, CC0
+const REC = { whales: 'whale', dolphins: 'dolphins', owls: 'owl', wolves: 'wolf', loon: 'loon', gulls: 'gulls', woodpecker: 'woodpecker', bees: 'bee' };
+
 export const ANIMALS = {
   whales: { name: 'Киты', far: true },
   dolphins: { name: 'Дельфины' },
@@ -52,7 +55,12 @@ export class Fauna {
     for (const k of Object.keys(ANIMALS)) {
       const v = L[k] || 0, was = this.lv[k] || 0; this.lv[k] = v;
       if (v > 0.01 && !(was > 0.01)) this.next[k] = this.E.now + rnd(1, 5);
-      if (k === 'cicadas' || k === 'cat') this.loop(k, v, fade);
+      if (k === 'cicadas' || k === 'cat' || k === 'frogs') {
+        // хор лягушек, цикады и кот — живые записи-фоны; синтез — только если записи нет
+        const F = this.app.field;
+        if (F && F.known('bed', k)) { F.setBed(k, v, fade); if (k !== 'frogs') this.loop(k, 0, fade); }
+        else if (k !== 'frogs') this.loop(k, v, fade);
+      }
     }
   }
   clear() { this.setLevels({}, 0.5); }
@@ -65,11 +73,53 @@ export class Fauna {
   tick(now, horizon, S) {
     for (const [k, v] of Object.entries(this.lv)) {
       if (!(v > 0.01) || k === 'cicadas' || k === 'cat') continue;
+      if (k === 'frogs' && this.app.field && this.app.field.known('bed', 'frogs')) continue;
       if (now + 0.5 < (this.next[k] || 0)) continue;
       const t = Math.max(now + 0.1, this.next[k] || now);
-      const gap = this[k](t, v);
+      const gap = (REC[k] && this.app.field && this.app.field.known('call', REC[k]) && this.rec(k, t, v)) || this[k](t, v);
       this.next[k] = t + gap * (1.6 - Math.min(1, v));
     }
+  }
+
+  // ---------- Живые голоса ----------
+  // Настоящая запись звучит из своего места: кит — глубоко внизу и медленно проплывает, волки — далеко за холмами,
+  // шмель облетает голову. Возвращает паузу до следующего голоса (или 0, если запись ещё грузится — тогда звучит синтез).
+  rec(k, t, v) {
+    const F = this.app.field, E = this.E, ctx = E.ctx, name = REC[k];
+    let pos, path = null, group = 'birds', send = 0.5, atmos, gain = 0.4, kind = 'bird', seq = false, rate = 1, gapAfter = [6, 20];
+    switch (k) {
+      case 'whales': {
+        if (!this.recWhale || Math.random() < 0.06) this.recWhale = { az: rnd(-180, 180) };
+        const W = this.recWhale; W.az += rnd(-30, 30);
+        pos = polar(W.az, rnd(-28, -6), rnd(8, 16)); path = (end) => [{ t, pos }, { t: end, pos: polar(W.az + sgn() * rnd(25, 60), rnd(-25, -5), rnd(8, 16)) }];
+        group = 'deep'; send = 0.8; atmos = 0.7; gain = 0.45; kind = 'water'; seq = true; gapAfter = [1.5, 6]; break;
+      }
+      case 'dolphins': {
+        const az = rnd(-180, 180), d = rnd(5, 10), dir = sgn();
+        pos = polar(az, rnd(-20, 5), d); path = (end) => Array.from({ length: 7 }, (_, i) => ({ t: t + (end - t) * i / 6, pos: polar(az + dir * i * 30, rnd(-20, 5), d) }));
+        send = 0.6; gain = 0.22; kind = 'water'; gapAfter = [2, 9]; break;
+      }
+      case 'owls': pos = polar(rnd(-170, 170), rnd(15, 40), rnd(10, 22)); send = 0.55; gain = 0.35; gapAfter = [10, 26]; break;
+      case 'wolves': pos = polar(rnd(-150, 150), rnd(0, 10), rnd(25, 45)); send = 0.9; atmos = 0.5; gain = 0.45; gapAfter = [25, 60]; break;
+      case 'loon': pos = polar(rnd(-120, 120), rnd(-5, 5), rnd(25, 45)); send = 0.85; atmos = 0.55; gain = 0.4; gapAfter = [14, 40]; break;
+      case 'gulls': { const az = rnd(-160, 160); pos = polar(az, rnd(25, 50), rnd(15, 30)); path = (end) => [{ t, pos }, { t: end + 2, pos: polar(az + sgn() * rnd(40, 90), rnd(25, 50), rnd(15, 30)) }]; send = 0.6; gain = 0.25; gapAfter = [5, 16]; break; }
+      case 'woodpecker': pos = polar(rnd(-160, 160), rnd(20, 45), rnd(12, 25)); send = 0.5; gain = 0.3; kind = 'rhythm'; gapAfter = [12, 30]; break;
+      case 'bees': {
+        const az0 = rnd(-180, 180), dir = sgn();
+        pos = polar(az0, 10, 1.4);
+        path = (end) => { const d = end - t, pts = []; for (let i = 0; i <= 14; i++) { const u = i / 14; pts.push({ t: t + u * d, pos: polar(az0 + dir * 360 * u + Math.sin(u * 9) * 20, 5 + 25 * Math.sin(u * 5), 0.9 + 1.4 * Math.abs(Math.sin(u * 3)) + u * 2.5) }); } return pts; };
+        send = 0.12; gain = 0.16; rate = rnd(0.95, 1.05); gapAfter = [20, 50]; break;
+      }
+      default: return 0;
+    }
+    const em = E.spawn({ group, pos, send, atmos, kind, label: ANIMALS[k].name, hrtf: true });
+    const g = ctx.createGain(); g.gain.value = gain * Math.min(1.3, v + 0.3); g.connect(em.input);
+    const end = F.call(g, t, name, { vel: 0.9, seq, rate });
+    if (end === null) { em.dispose(); return 0; }
+    if (path) em.path(path(end));
+    em.end = end; em.glow = 0.6; em.flash(t, end - t);
+    E.after(end + 1.5, () => { g.disconnect(); em.dispose(); });
+    return (end - t) + rnd(gapAfter[0], gapAfter[1]);
   }
 
   // ---------- Киты: темы из повторяющихся фраз, глубоко внизу и далеко ----------
@@ -144,7 +194,8 @@ export class Fauna {
         const src = E.noiseSource('white', false), hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 3500;
         const g = ctx.createGain(); g.gain.value = 0; src.connect(hp); hp.connect(g); g.connect(out);
         let ct = tt, rate = rnd(12, 30); const len = rnd(0.5, 1.4);
-        while (ct < tt + len) { g.gain.setValueAtTime(0.5, ct); g.gain.setTargetAtTime(0, ct + 0.0005, 0.0008); ct += 1 / rate; rate *= rnd(1.03, 1.1); }
+        // частота щелчков растёт, но не бесконечно: иначе шаги сходятся и цикл никогда не кончится
+        for (let n = 0; ct < tt + len && n < 160; n++) { g.gain.setValueAtTime(0.5, ct); g.gain.setTargetAtTime(0, ct + 0.0005, 0.0008); ct += 1 / rate; rate = Math.min(220, rate * rnd(1.03, 1.1)); }
         E.startNoise(src, tt); src.stop(ct + 0.05);
         tt = ct + rnd(0.1, 0.4);
       }

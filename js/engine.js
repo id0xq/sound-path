@@ -38,7 +38,8 @@ export class Engine {
   // Под водой: весь музыкальный фон темнеет и становится глухим, голос проводника остаётся ясным
   setUnderwater(v = 0, fade = 4) {
     v = clamp(v, 0, 1); this.underwater = v;
-    this.air.frequency.setTargetAtTime(14500 * Math.pow(700 / 14500, v), this.now, Math.max(0.1, fade / 3));
+    const f = v < 0.01 ? 20000 : 14500 * Math.pow(700 / 14500, v), tau = Math.max(0.1, fade / 3);
+    this.uwDry.frequency.setTargetAtTime(f, this.now, tau); this.uwRev.frequency.setTargetAtTime(f, this.now, tau);
     // глухой звук кажется тише — немного возвращаем громкость
     this.musicOut.gain.setTargetAtTime(2.1 * (1 + 0.55 * v), this.now, Math.max(0.1, fade / 3));
   }
@@ -91,7 +92,11 @@ export class Engine {
     this.dryBus.connect(this.dryDuck);
 
     this.musicSum = G();
-    this.revDuck.connect(this.musicSum); this.dryDuck.connect(this.musicSum);
+    // «под водой»: глохнут фон и отражения, а голос кита (группа «глубина») остаётся ясным
+    this.uwDry = ctx.createBiquadFilter(); this.uwDry.type = 'lowpass'; this.uwDry.frequency.value = 20000; this.uwDry.Q.value = 0.5;
+    this.uwRev = ctx.createBiquadFilter(); this.uwRev.type = 'lowpass'; this.uwRev.frequency.value = 20000; this.uwRev.Q.value = 0.5;
+    this.revDuck.connect(this.uwRev); this.uwRev.connect(this.musicSum); this.dryDuck.connect(this.uwDry); this.uwDry.connect(this.musicSum);
+    this.deepDuck = G(); this.deepDuck.connect(this.musicSum);
 
     this.carve = ctx.createBiquadFilter(); this.carve.type = 'peaking'; this.carve.frequency.value = 2600; this.carve.Q.value = 0.8; this.carve.gain.value = 0;
     this.tame = ctx.createBiquadFilter(); this.tame.type = 'highshelf'; this.tame.frequency.value = 8000; this.tame.gain.value = 0;
@@ -129,7 +134,8 @@ export class Engine {
     [this.anL, this.anR].forEach((a) => { a.fftSize = 8192; a.smoothingTimeConstant = 0.75; });
     split.connect(this.anL, 0); split.connect(this.anR, 1);
 
-    for (const name of ['atmos', 'nature', 'birds', 'instr', 'rhythm', 'groove', 'live', 'resonance', 'narrator']) this.createGroup(name);
+    for (const name of ['atmos', 'nature', 'birds', 'instr', 'rhythm', 'groove', 'live', 'resonance', 'narrator', 'deep']) this.createGroup(name);
+    this.groups.deep.dry.disconnect(); this.groups.deep.dry.connect(this.deepDuck);
 
     this.setSoftness(this.softness);
     this.setSpace('temple', 0.01);
@@ -241,6 +247,7 @@ export class Engine {
   duck(amount, depthDb = 7, speaking = false) {
     const t = this.now, tau = speaking ? 0.06 : 0.45;
     this.dryDuck.gain.setTargetAtTime(dbToGain(-depthDb * amount), t, tau);
+    this.deepDuck.gain.setTargetAtTime(dbToGain(-depthDb * amount), t, tau);
     this.revDuck.gain.setTargetAtTime(dbToGain(-depthDb * 1.5 * amount), t, tau);
     this.carve.gain.setTargetAtTime(-Math.min(6, depthDb * 0.8) * amount, t, tau);
   }

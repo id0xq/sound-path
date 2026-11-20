@@ -74,6 +74,8 @@ button, input, select { font: inherit; color: inherit; }
 .seg button[aria-checked="true"] { background: linear-gradient(180deg, rgba(230, 245, 255, 0.2), rgba(230, 245, 255, 0.08)); color: var(--text); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18); }
 .seg.small button { padding: 5px 10px; font-size: 12.5px; }
 .bw-sound { margin: 4px 0 2px; }
+.is-paused .dome-wrap { opacity: .5; transition: opacity .4s; }
+.is-paused #cueTime::after { content: '  · пауза'; color: var(--ice); }
 
 input[type="range"] { -webkit-appearance: none; appearance: none; width: 100%; height: 22px; background: transparent; cursor: pointer; }
 input[type="range"]::-webkit-slider-runnable-track { height: 2px; background: linear-gradient(90deg, rgba(134, 211, 232, 0.6), var(--edge-2)); border-radius: 2px; }

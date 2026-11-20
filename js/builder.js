@@ -59,7 +59,7 @@ export const BLOCKS = [
   { id: 'rhythm', name: 'Ритм', cat: 'Ритм', color: KIND_COLORS.rhythm, on: 'rhythm',
     fields: [{ k: 'rhythm', type: 'select', label: 'Рисунок', options: opt(PATTERNS) }, { k: 'tempo', type: 'range', label: 'Темп, уд/мин', min: 40, max: 120, step: 1 }, lvl('rhythmLevel', 'Громкость')] },
   { id: 'birds', name: 'Птицы', cat: 'Природа', color: KIND_COLORS.bird, on: 'birds', fields: [{ k: 'species', type: 'select', label: 'Какие', options: opt(SPECIES) }, lvl('birds', 'Сколько')] },
-  ...[['wind', 'Ветер'], ['leaves', 'Листва'], ['stream', 'Ручей'], ['waves', 'Волны'], ['rain', 'Дождь'], ['crickets', 'Сверчки'], ['fire', 'Костёр']].map(([k, n]) => ({
+  ...[['dawn', 'Утренний хор птиц'], ['woodland', 'Птицы в роще'], ['meadow', 'Летний луг'], ['wind', 'Ветер в деревьях'], ['leaves', 'Листва'], ['stream', 'Ручей'], ['waves', 'Волны'], ['rain', 'Дождь в лесу'], ['cityrain', 'Дождь в городе'], ['cave', 'Пещера, капли'], ['crickets', 'Сверчки'], ['fire', 'Костёр']].map(([k, n]) => ({
     id: k, name: n, cat: 'Природа', color: KIND_COLORS[k === 'stream' || k === 'waves' || k === 'rain' ? 'water' : k === 'fire' ? 'fire' : k === 'crickets' ? 'crickets' : 'bird'], on: 'nature.' + k, fields: [lvl('nature.' + k, 'Громкость', 1)],
   })),
   ...Object.entries(ANIMALS).map(([k, a]) => ({

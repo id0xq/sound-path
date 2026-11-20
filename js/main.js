@@ -51,7 +51,7 @@ function boot() {
   sphere = new Sphere($('#dome'), app);
   buildSpaces(); buildSets(); buildPads(); buildHang(); bindHang(); buildMixer(); bindVoice(); bindRecorder(); bindSettings(); bindPlacement(); bindKeys();
   app.breathwork = new Breathwork(app);
-  bindLines(); bindNarrator(); bindHead(); bindViz(); bindTabs(); bindBreath(); bindBuilder();
+  bindLines(); bindNarrator(); bindHead(); bindViz(); bindTabs(); bindBreath(); bindBuilder(); bindMedia();
 
   C.on('load', renderSet);
   C.on('chapter', ({ idx, ch }) => {
@@ -113,6 +113,7 @@ function buildSets() {
   $('#guidedBtn').addEventListener('click', () => startSet(true));
   $('#holdBtn').addEventListener('click', () => app.conductor.hold());
   $('#stopBtn').addEventListener('click', () => {
+    if (paused) setPaused(false);
     app.conductor.stop(); app.narrator.stop(); if (app.breathwork.active) app.breathwork.stop(true);
     if (app.recorder.active && recWithSet) setTimeout(() => stopRecording(), 6500);
     releaseWake();
@@ -160,12 +161,59 @@ function renderSet(set) {
   syncTransport(); buildHang();
 }
 
+// ---------- Пауза и фоновая работа ----------
+// Пауза замирает весь звук вместе с сюжетом и дыханием: время сета стоит, после «Продолжить» всё идёт с того же места.
+let paused = false;
+async function setPaused(p) {
+  const E = app.E; paused = p;
+  try { if (p) await E.ctx.suspend(); else await E.ctx.resume(); } catch (e) {}
+  if ('speechSynthesis' in window) { try { p ? speechSynthesis.pause() : speechSynthesis.resume(); } catch (e) {} }
+  for (const id of ['#pauseBtn', '#bwPause']) { const b = $(id); if (b) { b.textContent = p ? 'Продолжить' : 'Пауза'; b.setAttribute('aria-pressed', String(p)); } }
+  document.body.classList.toggle('is-paused', p);
+  syncTransport();
+}
+function togglePause() { if (app.conductor.running || (app.breathwork && app.breathwork.active)) setPaused(!paused); }
+// Экран блокировки, наушники и медиаклавиши: пауза, продолжить, следующая и предыдущая глава
+function updateMedia() {
+  if (!('mediaSession' in navigator)) return;
+  const C = app.conductor, B = app.breathwork, active = C.running || (B && B.active);
+  try {
+    navigator.mediaSession.playbackState = !active ? 'none' : paused ? 'paused' : 'playing';
+    if (active && C.set) {
+      const ch = C.chapter;
+      navigator.mediaSession.metadata = new MediaMetadata({ title: ch ? ch.title : C.set.title, artist: C.set.title, album: 'Звуковой путь',
+        artwork: [{ src: 'icon-512.png', sizes: '512x512', type: 'image/png' }, { src: 'icon-192.png', sizes: '192x192', type: 'image/png' }] });
+    }
+  } catch (e) {}
+}
+function bindMedia() {
+  $('#pauseBtn').addEventListener('click', togglePause);
+  $('#bwPause').addEventListener('click', togglePause);
+  if ('mediaSession' in navigator) {
+    const C = app.conductor;
+    const h = { play: () => paused && setPaused(false), pause: () => !paused && togglePause(), stop: () => $('#stopBtn').click(),
+      nexttrack: () => C.set && C.seek(C.chapterIdx + 1), previoustrack: () => C.set && C.seek(Math.max(0, C.chapterIdx - 1)) };
+    for (const [k, f] of Object.entries(h)) { try { navigator.mediaSession.setActionHandler(k, f); } catch (e) {} }
+  }
+  // вернуться к звуку после звонка, сворачивания или блокировки экрана, если пользователь не ставил паузу
+  const wake = () => { const ctx = app.E.ctx; if (!paused && ctx.state !== 'running' && ctx.state !== 'closed') ctx.resume().catch(() => {}); };
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') wake(); });
+  window.addEventListener('pageshow', wake); window.addEventListener('focus', wake);
+  app.E.ctx.addEventListener('statechange', () => { if (app.E.ctx.state === 'interrupted') setTimeout(wake, 800); });
+  window.addEventListener('keydown', (e) => {
+    if (e.code !== 'Space' || e.repeat) return;
+    const tag = (e.target && e.target.tagName) || ''; if (/INPUT|TEXTAREA|SELECT|BUTTON/.test(tag)) return;
+    if (app.conductor.running || (app.breathwork && app.breathwork.active)) { e.preventDefault(); togglePause(); }
+  });
+}
+
 function syncTransport() {
   const C = app.conductor;
   $('#playBtn').disabled = C.running; $('#guidedBtn').disabled = C.running;
   $('#guidedBtn').textContent = C.running ? (app.narrator.on ? 'Ведущий ведёт медитацию' : 'Сет идёт') : C.elapsed > 0 ? 'Медитация с голосом с этой главы' : 'Медитация с голосом';
   $('#playBtn').textContent = C.running ? 'Сет идёт' : C.elapsed > 0 ? 'Начать с этой главы' : 'Начать сет';
-  $('#holdBtn').disabled = !C.running; $('#stopBtn').disabled = !C.running;
+  $('#holdBtn').disabled = !C.running || paused; $('#stopBtn').disabled = !C.running; $('#pauseBtn').disabled = !C.running;
+  updateMedia();
   $('#holdBtn').setAttribute('aria-pressed', String(C.held)); $('#holdBtn').textContent = C.held ? 'Продолжить сюжет' : 'Задержать главу';
 }
 
@@ -333,7 +381,7 @@ function buildMixer() {
       else if (k === 'binaural') { app.binaural.user = val; app.binaural.apply(0.3); }
       else if (k === 'atmosTail') E.setAtmosLevel(val);
       else if (k === 'narrator') app.narrator.out.gain.setTargetAtTime(1.15 * val, E.now, 0.05);
-      else E.setGroup(k, { user: val });
+      else { E.setGroup(k, { user: val }); if (k === 'birds') E.setGroup('deep', { user: val }); }
       saved[k] = val; store.set('mix', saved);
     };
     input.addEventListener('input', apply); apply();
@@ -603,12 +651,12 @@ function bindBreath() {
   app.conductor.on('load', (set) => { if (B.active && !String(set.id).startsWith('breath-')) B.stop(true); });
   $('#bwRelease').addEventListener('click', () => B.release());
   B.on('start', (P) => {
-    $('#bwStart').disabled = true; $('#bwStop').disabled = false;
+    $('#bwStart').disabled = true; $('#bwStop').disabled = false; $('#bwPause').disabled = false; updateMedia();
     $('#cueTitle').textContent = P.name; $('#cueText').textContent = P.about; $('#cuePrev').textContent = P.rhythm; $('#cueCount').textContent = '';
     document.documentElement.style.setProperty('--chapter', P.color); sphere.tint = P.color;
   });
   B.on('stop', () => {
-    $('#bwStart').disabled = false; $('#bwStop').disabled = true; $('#bwRelease').hidden = true;
+    $('#bwStart').disabled = false; $('#bwStop').disabled = true; $('#bwPause').disabled = true; $('#bwRelease').hidden = true; if (paused) setPaused(false); updateMedia();
     sphere.setMode(vizBefore || 'dome');
     $('#cueNext').textContent = 'Практика завершена.';
     // вернуть выбранный сет, чтобы вкладка «Сеты» была готова

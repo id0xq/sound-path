@@ -335,6 +335,9 @@ const SONGS = {
     return L;
   },
 };
+// живые записи голосов (Freesound, CC0): у кого есть — поёт настоящий голос, у остальных — синтез
+const REC = { robin: 'robin', thrush: 'thrush', blackbird: 'blackbird', chaffinch: 'chaffinch', cuckoo: 'cuckoo', dove: 'dove',
+  oriole: 'oriole', wren: 'wren', nightingale: 'nightingale' };
 // короткие позывки между песнями
 const CALLS = {
   robin: (b) => [{ t: 0, d: 0.05, f: [8200 * b.k, 7600 * b.k], a: 0.3 }],
@@ -366,8 +369,10 @@ export class Birds {
         const r = Math.random();
         if (r < 0.05 && b.sp !== 'cuckoo') { this.fly(b, t, S); b.next = t + 2.2; continue; }
         if (r < 0.13) { this.hop(b, t); }
-        if (r > 0.82 && CALLS[b.sp]) { const e = syllables(this.E, b.voice, t, CALLS[b.sp](b)); b.em.flash(t, e - t); b.next = e + rnd(0.6, 2); continue; }
-        const end = syllables(this.E, b.voice, t, SONGS[b.sp](b));
+        const recName = REC[b.sp];
+        const rec = recName && this.field ? this.field.call(b.voice, t, recName, { vel: 0.85, rate: 1 + (b.k - 1) * 0.3 }) : null;
+        if (rec === null && r > 0.82 && CALLS[b.sp]) { const e = syllables(this.E, b.voice, t, CALLS[b.sp](b)); b.em.flash(t, e - t); b.next = e + rnd(0.6, 2); continue; }
+        const end = rec ?? syllables(this.E, b.voice, t, SONGS[b.sp](b));
         b.em.flash(t, end - t);
         const [a, z] = BIRDS[b.sp].pause; b.next = end + rnd(a, z) * (1.3 - Math.min(1, S.birds || 0) * 0.5) * b.tempo;
         // перекличка: соседи того же вида не перебивают и часто отвечают
@@ -389,6 +394,7 @@ export class Birds {
     const hp = E.ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = sp === 'dove' || sp === 'cuckoo' ? 200 : sp === 'blackbird' || sp === 'oriole' ? 700 : 1200;
     voice.connect(hp); hp.connect(em.input);
     const b = { sp, em, voice, pos, k: rnd(0.9, 1.1), tempo: rnd(0.85, 1.15), next: now + rnd(0.3, 3) };
+    if (REC[sp] && this.field) this.field.load('call', REC[sp]);   // живой голос подгружается заранее
     this.list.push(b);
     return b;
   }
