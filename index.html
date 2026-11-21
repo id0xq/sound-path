@@ -7,7 +7,7 @@
   <meta name="description" content="Пространство для звуковых медитаций с голосом проводника: объём в наушниках, ханг, птицы, колокольчики, голос ведущего, запись сессии.">
   <meta name="theme-color" content="#f7f3ee">
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="icon" href="favicon.png" type="image/png">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
@@ -21,7 +21,7 @@
 <body>
   <div class="gate" id="gate">
     <div class="gate-inner">
-      <svg class="gate-logo" viewBox="0 0 120 120" aria-hidden="true"><use href="#smoke"/></svg>
+      <img class="gate-logo" src="logo-smoke.webp" width="347" height="498" alt="">
       <h1>Звуковой путь</h1>
       <p class="lead">Звуковые медитации, дыхание и путешествия. Ханг, живые инструменты, птицы и киты звучат вокруг вас, а голос проводника остаётся ясным.</p>
       <p class="note">Наденьте наушники: объём слышен только в них.</p>
@@ -31,22 +31,9 @@
     </div>
   </div>
 
-  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
-    <defs>
-      <linearGradient id="smokeA" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#9d8cf0"/><stop offset=".55" stop-color="#f3a9c2"/><stop offset="1" stop-color="#f7c99a" stop-opacity=".2"/></linearGradient>
-      <linearGradient id="smokeB" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#6fc3c0"/><stop offset=".6" stop-color="#9d8cf0"/><stop offset="1" stop-color="#9d8cf0" stop-opacity=".15"/></linearGradient>
-      <symbol id="smoke" viewBox="0 0 120 120">
-        <path d="M60 112 C48 96 72 86 60 70 C49 56 70 46 62 32 C57 23 64 14 70 8" fill="none" stroke="url(#smokeA)" stroke-width="3.2" stroke-linecap="round" opacity=".9"/>
-        <path d="M54 112 C40 98 58 84 46 70 C36 58 52 46 44 34 C39 27 42 18 47 12" fill="none" stroke="url(#smokeB)" stroke-width="2.4" stroke-linecap="round" opacity=".7"/>
-        <path d="M66 112 C80 100 62 86 76 72 C88 60 72 48 82 36 C88 28 84 20 80 14" fill="none" stroke="url(#smokeB)" stroke-width="2" stroke-linecap="round" opacity=".55"/>
-        <path d="M60 112 C66 100 52 92 58 80 C64 70 54 62 58 52" fill="none" stroke="url(#smokeA)" stroke-width="1.4" stroke-linecap="round" opacity=".45"/>
-      </symbol>
-    </defs>
-  </svg>
-
   <header class="top">
     <div class="brand">
-      <svg class="logo" viewBox="0 0 120 120" aria-hidden="true"><use href="#smoke"/></svg>
+      <img class="logo" src="icon-192.png" width="40" height="40" alt="">
       <span>Звуковой путь</span>
     </div>
     <nav class="seg modes" id="modeTabs" role="tablist" aria-label="Режим">
@@ -83,7 +70,7 @@
         <div class="clock"><span id="elapsed">0:00</span><span class="of">из</span><span id="total">30:00</span></div>
         <div class="row-ctl"><label for="tempo">Темп ритма</label><input type="range" id="tempo" min="0.8" max="1.25" step="0.01" value="1"><output id="tempoOut">100%</output></div>
         <div class="row-ctl"><label for="seed">Вариация</label><input id="seed" inputmode="numeric" autocomplete="off"><button class="btn small" id="dice">Новая</button></div>
-        <ol class="chapters" id="chapters"></ol>
+        <details class="chapters-wrap" id="chaptersWrap" open><summary>Главы</summary><ol class="chapters" id="chapters"></ol></details>
       </div>
       <div class="tab-breath" id="tabBreath" hidden>
         <label class="field"><span>Практика</span><select id="breathSelect" aria-label="Дыхательная практика"></select></label>
@@ -135,7 +122,7 @@
         <div class="cue-head"><h2 id="cueTitle">Выберите сет</h2><span class="cue-time" id="cueTime"></span></div>
         <p class="cue-text" id="cueText" aria-live="polite">Здесь появятся слова для проводника. Они сменяются сами по ходу сюжета.</p>
         <p class="cue-prev" id="cuePrev"></p>
-        <div class="cue-foot">
+        <div class="cue-foot" id="cueFoot">
           <button class="btn small" id="linePrev" aria-label="Предыдущая реплика">‹ Назад</button>
           <button class="cue-count" id="cueCount"></button>
           <button class="btn small" id="lineNext" aria-label="Следующая реплика">Дальше ›</button>
@@ -144,7 +131,7 @@
       </div>
       <div class="stage-card">
         <div class="stage-bar">
-          <div class="seg dark" id="stageSwitch" role="radiogroup" aria-label="Что в центре">
+          <div class="seg" id="stageSwitch" role="radiogroup" aria-label="Что в центре">
             <button data-view="space" role="radio" aria-checked="true">Звук вокруг</button>
             <button data-view="hang" role="radio" aria-checked="false">Ханг</button>
           </div>
@@ -162,7 +149,7 @@
           </div>
           <div class="placement">
             <span class="pl-label">Живые звуки</span>
-            <div class="seg dark" id="placeMode" role="radiogroup" aria-label="Откуда звучат живые звуки">
+            <div class="seg" id="placeMode" role="radiogroup" aria-label="Откуда звучат живые звуки">
               <button data-mode="around" role="radio" aria-checked="true">вокруг</button>
               <button data-mode="point" role="radio" aria-checked="false">из точки</button>
               <button data-mode="orbit" role="radio" aria-checked="false">по кругу</button>
@@ -190,7 +177,7 @@
             <button data-mic="voice" role="radio" aria-checked="true">Веду голосом</button>
             <button data-mic="path" role="radio" aria-checked="false">Мир в атмосферу</button>
           </div>
-          <div class="mic-row"><select id="micSelect" aria-label="Микрофон"><option value="">Микрофон по умолчанию</option></select><button class="btn primary" id="micBtn">Включить</button></div>
+          <div class="mic-row"><select id="micSelect" aria-label="Микрофон"><option value="">Микрофон</option></select><button class="btn primary" id="micBtn">Включить</button></div>
           <div class="meter" aria-hidden="true"><div class="meter-fill" id="micMeter"></div></div>
           <p class="meter-state" id="micState">Микрофон выключен</p>
           <div class="sliders">
@@ -226,7 +213,11 @@
         </div>
       </details>
 
-      <details class="card sounds" id="soundsCard" open>
+    </aside>
+  </main>
+
+  <section class="tray-sounds" aria-label="Звуки">
+    <details class="card sounds" id="soundsCard" open>
         <summary><h3>Звуки</h3></summary>
         <div class="card-body">
           <div class="seg tabs" id="soundTabs" role="tablist" aria-label="Звуки">
@@ -254,8 +245,14 @@
           </div>
         </div>
       </details>
-    </aside>
-  </main>
+  </section>
+
+  <div class="nowbar" id="nowBar" hidden>
+    <span class="now-dot" aria-hidden="true"></span>
+    <div class="now-info"><span class="now-title" id="nowTitle">Сейчас звучит</span><span class="now-sub" id="nowSub"></span></div>
+    <button class="btn small" id="nowPause">Пауза</button>
+    <button class="btn small ghost" id="nowStop">Завершить</button>
+  </div>
 
   <aside class="drawer card" id="narratorPanel" hidden aria-label="Голос ведущего">
     <div class="drawer-head"><h3>Голос ведущего</h3><button class="btn ghost small" data-close>Закрыть</button></div>

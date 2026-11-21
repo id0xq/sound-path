@@ -53,14 +53,14 @@ function boot() {
   sphere = new Sphere($('#dome'), app);
   buildSpaces(); buildSets(); buildPads(); buildHang(); bindHang(); buildMixer(); bindVoice(); bindRecorder(); bindSettings(); bindPlacement(); bindKeys();
   app.breathwork = new Breathwork(app);
-  bindLines(); bindNarrator(); bindHead(); bindViz(); bindTabs(); bindBreath(); bindBuilder(); bindMedia(); bindWaves(); bindPath();
+  bindLines(); bindNarrator(); bindHead(); bindViz(); bindTabs(); bindBreath(); bindBuilder(); bindMedia(); bindWaves(); bindPath(); bindNow();
 
   C.on('load', renderSet);
   C.on('chapter', ({ idx, ch }) => {
     document.documentElement.style.setProperty('--chapter', ch.color || '#7fc4c0');
     sphere.tint = ch.color || '#7fc4c0';
     $('#cueTitle').textContent = ch.title;
-    if (!C.lines.length) $('#cueText').textContent = ch.cue || '';
+    if (!C.lines.length || C.shownLine < 0) $('#cueText').textContent = ch.cue || '';
     $$('#chapters li').forEach((li, i) => { li.classList.toggle('now', i === idx); li.classList.toggle('done', i < idx); });
     buildHang();
   });
@@ -138,14 +138,16 @@ function buildSets() {
   $('#tempo').addEventListener('input', (e) => { const v = Number(e.target.value); $('#tempoOut').value = Math.round(v * 100) + '%'; app.conductor.setTempoFactor(v); });
 }
 
+// на телефоне после старта меню режима сворачивается — видны слова, купол и пауза внизу
+function foldPanelOnPhone() { if (window.matchMedia('(max-width: 820px)').matches) { $('#modePanel').open = false; window.scrollTo({ top: 0, behavior: 'smooth' }); } }
 async function startSet(withVoice) {
   const C = app.conductor;
   if (C.running) return;
   app.narrator.on = !!withVoice; $('#narrOn').checked = !!withVoice;
   if ('speechSynthesis' in window && withVoice) speechSynthesis.speak(new SpeechSynthesisUtterance(' ')); // разрешение звука речи на iPhone
   await app.E.ctx.resume();
-  if (!C.set) C.load(setId, Number($('#seed').value) || 1);
-  C.start();
+  if (!C.set || /^(path|breath-)/.test(C.set.id)) C.load(setId, Number($('#seed').value) || 1);
+  C.start(); foldPanelOnPhone();
   if (recWithSet && !app.recorder.active) startRecording();
   requestWake();
 }
@@ -198,6 +200,29 @@ function bindWaves() {
     const tag = (e.target && e.target.tagName) || ''; if (/INPUT|TEXTAREA|SELECT/.test(tag)) return;
     toggle();
   });
+}
+
+// ---------- Плеер «Сейчас звучит»: пауза всегда под рукой, в любом режиме ----------
+function updateNow() {
+  const C = app.conductor, B = app.breathwork, P = app.path, bar = $('#nowBar');
+  const active = !!(C.running || (B && B.active) || (P && P.active));
+  bar.hidden = !active; document.body.classList.toggle('has-now', active);
+  if (!active) return;
+  let title, sub;
+  if (P && P.active) { title = 'Путь · мир через микрофон'; sub = ((SPACES[app.E.spaceName] || {}).name || '') + ' · ' + fmtTime(C.elapsed); }
+  else if (B && B.active) { const st = B.state(app.E.now); title = 'Дыхание · ' + (B.P ? B.P.name : ''); sub = (st && st.label ? st.label + ' · ' : '') + Math.round(B.progress(app.E.now) * 100) + '%'; }
+  else { const ch = C.chapter; title = (C.set ? C.set.title : '') + (ch ? ' · ' + ch.title : ''); sub = fmtTime(C.elapsed) + (isFinite(C.duration) ? ' из ' + fmtTime(C.duration) : '') + (C.held ? ' · глава задержана' : ''); }
+  $('#nowTitle').textContent = title; $('#nowSub').textContent = sub;
+  $('#nowPause').textContent = paused ? 'Продолжить' : 'Пауза';
+}
+function bindNow() {
+  $('#nowPause').addEventListener('click', togglePause);
+  $('#nowStop').addEventListener('click', () => {
+    if (app.path.active) $('#pathStop').click();
+    else if (app.breathwork.active) $('#bwStop').click();
+    else $('#stopBtn').click();
+  });
+  setInterval(updateNow, 250);
 }
 
 // ---------- Пауза и фоновая работа ----------
@@ -458,7 +483,7 @@ function bindVoice() {
       await V.enable($('#micSelect').value || undefined);
       $('#micBtn').textContent = 'Выключить';
       const devs = await V.devices(), sel = $('#micSelect'), cur = sel.value;
-      sel.innerHTML = '<option value="">Микрофон по умолчанию</option>' + devs.map((d) => `<option value="${d.deviceId}">${escapeHtml(d.label || 'Микрофон')}</option>`).join('');
+      sel.innerHTML = '<option value="">Микрофон</option>' + devs.map((d) => `<option value="${d.deviceId}">${escapeHtml(d.label || 'Микрофон')}</option>`).join('');
       sel.value = cur;
     } catch (e) {
       $('#micState').textContent = e.name === 'NotAllowedError' ? 'Доступ запрещён. Разрешите микрофон в настройках браузера для этой страницы.' : 'Микрофон не включился: ' + e.message;
@@ -533,7 +558,7 @@ function renderLine({ idx, manual } = {}) {
   const i = idx ?? C.shownLine;
   const cur = L[i];
   const el = $('#cueText');
-  const text = cur ? cur.text : (C.set && !C.running ? 'Нажмите «Начать сет» — здесь появятся слова для проводника. Их можно листать вперёд и назад.' : '');
+  const text = cur ? cur.text : C.running ? ((C.chapter && C.chapter.cue) || '') : (C.set ? 'Нажмите «Начать сет» — здесь появятся слова для проводника. Их можно листать вперёд и назад.' : '');
   if (el.textContent !== text) {
     el.classList.add('fade');
     setTimeout(() => { el.textContent = text; el.classList.remove('fade'); }, manual ? 60 : 380);
@@ -543,6 +568,12 @@ function renderLine({ idx, manual } = {}) {
   const ahead = C.viewIdx !== null && C.viewIdx > C.lineIdx, behind = C.viewIdx !== null && C.viewIdx < C.lineIdx;
   $('#cueCount').textContent = L.length ? `${Math.max(0, i + 1)} из ${L.length}${ahead ? ' · вы впереди сюжета' : behind ? ' · нажмите, чтобы вернуться к сюжету' : ''}` : '';
   $('#linePrev').disabled = i <= 0; $('#lineNext').disabled = i >= L.length - 1;
+  cueFoot();
+}
+// листать реплики имеет смысл только в сете со словами
+function cueFoot() {
+  const C = app.conductor, own = C.set && !/^(path|breath-)/.test(C.set.id);
+  $('#cueFoot').hidden = !(own && C.lines.length && (C.running || !$('#tabSets').hidden));
 }
 function bindLines() {
   $('#linePrev').addEventListener('click', () => app.conductor.stepLine(-1));
@@ -657,14 +688,29 @@ function bindTabs() {
     $$('#soundsCard [data-st]').forEach((el) => { if (el.tagName !== 'BUTTON') el.hidden = el.dataset.st !== b.dataset.st; });
   }));
   // на телефоне блоки свёрнуты — открываются по касанию
-  if (window.matchMedia('(max-width: 820px)').matches) ['#voiceCard', '#recCard', '#soundsCard'].forEach((id) => { $(id).open = false; });
+  if (window.matchMedia('(max-width: 820px)').matches) ['#voiceCard', '#recCard', '#soundsCard', '#chaptersWrap'].forEach((id) => { $(id).open = false; });
 }
+let cueBorrowed = false;
 function showTab(tab) {
   $$('#modeTabs button').forEach((x) => { const on = x.dataset.tab === tab; x.setAttribute('aria-checked', String(on)); x.setAttribute('aria-selected', String(on)); });
   $('#tabSets').hidden = tab !== 'sets'; $('#tabBreath').hidden = tab !== 'breath'; $('#tabPath').hidden = tab !== 'path';
   $('#panelTitle').textContent = { sets: 'Сет', breath: 'Дыхание', path: 'Путь' }[tab];
   $('#modePanel').open = true;
   $$('#micMode button').forEach((x) => x.setAttribute('aria-checked', String(x.dataset.mic === (tab === 'path' ? 'path' : 'voice'))));
+  cueFoot();
+  // в тишине вкладка показывает своё: выбранный сет, практику или путь
+  const C = app.conductor, idle = !C.running && !app.breathwork.active && !app.path.active;
+  if (!idle) return;
+  if (tab === 'sets') {
+    if (!C.set || /^(path|breath-)/.test(C.set.id)) C.load(setId, Number($('#seed').value) || 1);
+    else if (cueBorrowed) C.load(C.set, C.seed); // вернуть сету его заголовок и слова
+    cueBorrowed = false;
+    return;
+  }
+  cueBorrowed = true;
+  const cue = (title, text, prev, next) => { $('#cueTitle').textContent = title; $('#cueText').textContent = text; $('#cuePrev').textContent = prev; $('#cueNext').textContent = next; $('#cueCount').textContent = ''; };
+  if (tab === 'breath') { const P = PROGRAMS.find((p) => p.id === breathId); if (P) cue(P.name, P.about, P.rhythm, 'Нажмите «Начать», когда будете готовы.'); }
+  if (tab === 'path') cue('Путь', 'Наденьте наушники и включите путь: голос, шаги и звуки вокруг превращаются в музыку в выбранном строе.', '', '');
 }
 
 // ---------- Путь: мир через микрофон превращается в музыку ----------
@@ -692,7 +738,7 @@ function bindPath() {
     if (app.breathwork.active) app.breathwork.stop(true);
     $('#pathHint').textContent = 'Включаю микрофон… Наденьте наушники.';
     try {
-      await P.start(opts(), $('#micSelect').value || undefined);
+      await P.start(opts(), $('#micSelect').value || undefined); foldPanelOnPhone();
       $('#micBtn').textContent = 'Выключить';
       $('#pathHint').textContent = 'Слушаю мир. Говорите, дышите, идите — всё превращается в музыку.';
       if (recWithSet && !app.recorder.active) startRecording();
@@ -700,7 +746,7 @@ function bindPath() {
     } catch (e) { $('#pathHint').textContent = 'Микрофон не включился: ' + e.message; }
     sync();
   });
-  $('#pathStop').addEventListener('click', () => { P.stop(); $('#pathHint').textContent = 'Путь завершён.'; if (app.recorder.active && recWithSet) setTimeout(() => stopRecording(), 6500); sync(); });
+  $('#pathStop').addEventListener('click', () => { P.stop(); $('#pathHint').textContent = 'Путь завершён.'; setTimeout(() => { if (!P.active && !app.conductor.running && !app.breathwork.active && $('#tabPath').hidden) app.conductor.load(setId, Number($('#seed').value) || 1); }, 1500); if (app.recorder.active && recWithSet) setTimeout(() => stopRecording(), 6500); sync(); });
   $('#pathFreeze').addEventListener('click', () => app.E.dissolve(12));
   // режим микрофона в карточке голоса
   $$('#micMode button').forEach((b) => b.addEventListener('click', () => {
@@ -754,7 +800,7 @@ function bindBreath() {
   $('#bwStop').addEventListener('click', () => B.stop());
   app.conductor.on('load', (set) => { if (B.active && !String(set.id).startsWith('breath-')) B.stop(true); });
   $('#bwRelease').addEventListener('click', () => B.release());
-  B.on('start', (P) => {
+  B.on('start', (P) => { foldPanelOnPhone();
     $('#bwStart').disabled = true; $('#bwStop').disabled = false; $('#bwPause').disabled = false; updateMedia();
     $('#cueTitle').textContent = P.name; $('#cueText').textContent = P.about; $('#cuePrev').textContent = P.rhythm; $('#cueCount').textContent = '';
     document.documentElement.style.setProperty('--chapter', P.color); sphere.tint = P.color;
