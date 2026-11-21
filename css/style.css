@@ -85,14 +85,14 @@ select { appearance: none; -webkit-appearance: none; padding-right: 36px; cursor
 input[type="checkbox"] { accent-color: var(--accent); width: 18px; height: 18px; margin: 0; }
 
 /* ---------- Логотип и вход ---------- */
-.logo { width: 40px; height: 40px; display: block; border-radius: 12px; box-shadow: 0 6px 16px rgba(90, 76, 130, 0.25); }
+.logo { width: 44px; height: 44px; display: block; border-radius: 13px; box-shadow: 0 6px 16px rgba(90, 76, 130, 0.25); }
 .gate { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 24px; background: var(--bg); }
 .gate::before { content: ''; position: absolute; inset: 0; z-index: -1; background:
   radial-gradient(600px 420px at 30% 20%, rgba(247, 201, 168, 0.6), transparent 70%),
   radial-gradient(640px 460px at 75% 30%, rgba(157, 140, 240, 0.32), transparent 70%),
   radial-gradient(700px 520px at 50% 100%, rgba(143, 211, 198, 0.35), transparent 70%); }
 .gate-inner { max-width: 540px; text-align: center; }
-.gate-logo { height: 210px; width: auto; filter: drop-shadow(0 14px 30px rgba(110, 90, 190, 0.22)); margin-bottom: 8px; animation: rise 6s ease-in-out infinite; }
+.gate-logo { width: 176px; height: 176px; border-radius: 40px; box-shadow: 0 22px 50px rgba(90, 76, 130, 0.32), 0 2px 6px rgba(90, 76, 130, 0.18); margin-bottom: 18px; animation: rise 6s ease-in-out infinite; }
 @keyframes rise { 50% { transform: translateY(-6px); opacity: .85; } }
 .gate h1 { font-family: var(--display); font-weight: 400; font-size: clamp(46px, 9vw, 72px); line-height: 1; margin-bottom: 16px; }
 .gate .lead { font-size: 17px; margin: 0 auto 10px; max-width: 46ch; color: #4a465e; }
