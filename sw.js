@@ -1,8 +1,8 @@
 // Офлайн-режим: приложение сохраняется на телефоне и открывается без сети (например, на прогулке в лесу).
 // Стратегия «сначала сеть»: если сеть есть — берём свежую версию, если нет — из кеша.
-const CACHE = 'zvukovoy-put-v10';
+const CACHE = 'zvukovoy-put-v11';
 const FILES = [
-  './', './index.html', './css/style.css', './manifest.webmanifest', './favicon.png', './icon-192.png', './icon-512.png',
+  './', './index.html', './css/style.css', './manifest.webmanifest', './favicon.png', './logo-smoke.webp', './icon-192.png', './icon-512.png',
   './js/app.js', './js/atmos.js', './js/conductor.js', './js/dsp.js', './js/engine.js', './js/generators.js', './js/instruments.js',
   './js/live.js', './js/main.js', './js/nature.js', './js/recorder.js', './js/rhythm.js', './js/sets.js', './js/sphere.js',
   './js/theory.js', './js/util.js', './js/voice.js', './js/worklets/capture.js', './js/worklets/fdn.js',
