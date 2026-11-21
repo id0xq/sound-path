@@ -12,9 +12,12 @@ export class Voice {
   constructor(E) {
     this.E = E; this.enabled = false; this.stream = null;
     this.settings = {
-      level: 0.9, clarity: 0.6, halo: 0.25, duckDb: 7, gate: true, noiseSuppression: false,
-      monitor: true, resonance: 0, resonanceDuck: true, warmth: 0.2,
+      level: 0.9, clarity: 0.5, halo: 0.25, duckDb: 7, gate: true, noiseSuppression: true,
+      monitor: true, resonance: 0, resonanceDuck: true, warmth: 0.35,
+      // «Путь»: всё, что слышит микрофон, превращается в атмосферу (как в Sound Temple)
+      mode: 'voice', pathTransform: 0.8, pathAtmos: 0.7, pathDry: 0,
     };
+    this.noiseFloor = -60;
     this.env = 0; this.speaking = 0; this.levelDb = -90; this.holdUntil = 0;
     this.build();
   }
@@ -29,6 +32,11 @@ export class Voice {
     this.presence = f('peaking', 3200, 0.9, 2.5);
     this.air = f('highshelf', 9500, 0.7, 2);
     this.sib = f('peaking', 6800, 2.5, -1.5);
+    this.body = f('lowshelf', 190, 0.7, 1.5);   // тепло груди
+    // деэссер: верх выше 5,5 кГц сжимается отдельно, свистящие «с» и «ш» становятся мягче
+    this.deLo = f('lowpass', 5500, 0.5); this.deHi = f('highpass', 5500, 0.5);
+    this.deComp = ctx.createDynamicsCompressor(); this.deComp.threshold.value = -38; this.deComp.ratio.value = 6; this.deComp.knee.value = 6; this.deComp.attack.value = 0.002; this.deComp.release.value = 0.08;
+    this.deSum = ctx.createGain();
     this.comp = ctx.createDynamicsCompressor();
     this.comp.threshold.value = -26; this.comp.knee.value = 10; this.comp.ratio.value = 3.5; this.comp.attack.value = 0.004; this.comp.release.value = 0.18;
     this.makeup = ctx.createGain(); this.makeup.gain.value = dbToGain(7);
@@ -39,7 +47,9 @@ export class Voice {
     this.toStereo = ctx.createGain(); this.toStereo.channelCount = 2; this.toStereo.channelCountMode = 'explicit'; this.toStereo.channelInterpretation = 'speakers';
 
     this.input.connect(this.trim); this.trim.connect(this.hp1); this.hp1.connect(this.hp2); this.hp2.connect(this.mud); this.mud.connect(this.box);
-    this.box.connect(this.presence); this.presence.connect(this.air); this.air.connect(this.sib); this.sib.connect(this.comp);
+    this.box.connect(this.body); this.body.connect(this.presence); this.presence.connect(this.air); this.air.connect(this.sib);
+    this.sib.connect(this.deLo); this.sib.connect(this.deHi); this.deHi.connect(this.deComp); this.deLo.connect(this.deSum); this.deComp.connect(this.deSum);
+    this.deSum.connect(this.comp);
     this.comp.connect(this.makeup); this.makeup.connect(this.warm); this.warm.connect(this.gateG); this.gateG.connect(this.fader); this.fader.connect(this.toStereo);
     this.toStereo.connect(E.voiceSum);
 
@@ -75,6 +85,12 @@ export class Voice {
       this.resBands.push(bp);
     }
     E.setGroup('resonance', { user: 1, scene: 0.5 });
+    // в атмосферный хвост (как в Valhalla): мир звучит издалека и превращается в облако
+    this.pathAtmos = ctx.createGain(); this.pathAtmos.gain.value = 0;
+    const pathLp = f('lowpass', 6500, 0.5);
+    this.hp1.connect(pathLp); pathLp.connect(this.pathAtmos); this.pathAtmos.connect(E.atmosSend);
+    // спектр для «мелодии мира»
+    this.spec = ctx.createAnalyser(); this.spec.fftSize = 4096; this.spec.smoothingTimeConstant = 0.3; this.hp1.connect(this.spec);
     this.applySettings();
   }
 
@@ -115,15 +131,20 @@ export class Voice {
     let sum = 0; for (let i = 0; i < this.buf.length; i++) sum += this.buf[i] * this.buf[i];
     const db = gainToDb(Math.sqrt(sum / this.buf.length));
     this.levelDb = db;
-    const thr = -46;
+    // шум комнаты: медленно ползёт вверх, быстро опускается — порог речи всегда на 12 дБ выше него
+    this.noiseFloor = db < this.noiseFloor ? this.noiseFloor + (db - this.noiseFloor) * 0.2 : this.noiseFloor + 0.02;
+    this.noiseFloor = Math.max(-80, Math.min(-35, this.noiseFloor));
+    const thr = Math.max(-50, this.noiseFloor + 12);
     const now = performance.now();
+    if (s.mode === 'path') { this.speaking = 0; E.duck(0, s.duckDb, false); this.gateG.gain.setTargetAtTime(1, t, 0.1); return; }
     if (db > thr) this.holdUntil = now + 380;
     const target = now < this.holdUntil ? 1 : 0;
     // быстрая атака, мягкое отпускание
     this.speaking += (target - this.speaking) * (target > this.speaking ? 0.5 : 0.06);
     E.duck(this.speaking, s.duckDb, target > 0.5);
     // гейт: убирает шум между фразами (−14 дБ, не до тишины — звучит естественно)
-    if (s.gate) this.gateG.gain.setTargetAtTime(db > thr - 8 || target ? 1 : dbToGain(-14), t, db > thr - 8 ? 0.01 : 0.2);
+    // экспандер: между фразами шум уходит на −20 дБ плавно, без «щелчков»
+    if (s.gate) this.gateG.gain.setTargetAtTime(db > thr - 6 || target ? 1 : dbToGain(-20), t, db > thr - 6 ? 0.008 : 0.25);
     else this.gateG.gain.setTargetAtTime(1, t, 0.05);
     // ореол слышен, когда речь закончилась
     this.haloDuck.gain.setTargetAtTime(1 - this.speaking * 0.94, t, target ? 0.04 : 0.25);
@@ -145,13 +166,18 @@ export class Voice {
 
   applySettings() {
     const s = this.settings, t = this.E.ctx.currentTime;
-    this.fader.gain.setTargetAtTime(s.level, t, 0.05);
     this.presence.gain.setTargetAtTime(0.5 + s.clarity * 4, t, 0.05);
     this.air.gain.setTargetAtTime(s.clarity * 3.5, t, 0.05);
     this.mud.gain.setTargetAtTime(-1 - s.clarity * 3, t, 0.05);
-    this.haloLevel.gain.setTargetAtTime(s.halo * 0.7, t, 0.1);
+    this.body.gain.setTargetAtTime(0.5 + s.warmth * 3, t, 0.1);
+    // режимы: «голос» — сухой ясный голос поверх сета; «путь» — микрофон уходит в атмосферу
+    const path = s.mode === 'path';
+    this.fader.gain.setTargetAtTime(path ? s.level * s.pathDry : s.level, t, 0.2);
+    this.pathAtmos.gain.setTargetAtTime(path ? s.pathAtmos * 1.4 : 0, t, 0.3);
+    this.haloLevel.gain.setTargetAtTime(path ? 0 : s.halo * 0.7, t, 0.2);
+    if (path) this.resIn.gain.setTargetAtTime(s.pathTransform * 1.2, t, 0.3);
     this.E.voiceMonitor.gain.setTargetAtTime(s.monitor ? 1 : 0, t, 0.03);
-    if (!s.resonance) this.resIn.gain.setTargetAtTime(0, t, 0.1);
+    if (!s.resonance && !path) this.resIn.gain.setTargetAtTime(0, t, 0.1);
     this.setWarmth(s.warmth);
   }
   set(key, val) { this.settings[key] = val; this.applySettings(); if (key === 'noiseSuppression' && this.stream) { const tr = this.stream.getAudioTracks()[0]; tr && tr.applyConstraints({ noiseSuppression: val }).catch(() => {}); } }

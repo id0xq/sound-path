@@ -203,8 +203,10 @@ export class Conductor {
       const li = this.lineIndexAt(this.elapsed);
       if (li !== this.lineIdx) {
         const natural = li === this.lineIdx + 1;
-        this.lineIdx = li; this.viewIdx = null;
-        this.emit('line', { idx: li, speak: natural });
+        this.lineIdx = li;
+        // проводник пролистал вперёд — сюжет догоняет его, но никогда не тянет текст назад
+        if (this.viewIdx !== null && this.viewIdx > li) { /* остаёмся на выбранной реплике */ }
+        else { this.viewIdx = null; this.emit('line', { idx: li, speak: natural }); }
         const L = this.lines[li];
         if (natural && L && L.ping) A.gen.ping(L.ping, now + 0.05);
       }

@@ -191,6 +191,8 @@ export function makeFreeSet(rng) {
   const names = ['Рассвет', 'Купол', 'Туман над рекой', 'Высота', 'Кедры', 'Пещера', 'Звёзды', 'Тихий берег', 'Ветер', 'Свет'];
   const chapters = []; let at = 0;
   const startTuning = rng.pick(tunings);
+  // реплики по кругу из перемешанного списка — без повторов подряд
+  const deck = []; const line = () => { if (!deck.length) deck.push(...[...FREE_LINES].sort(() => rng.next() - 0.5)); return deck.pop(); };
   for (let i = 0; i < 24; i++) {
     const space = rng.pick(spaces);
     const outdoor = space === 'forest' || rng.chance(0.4);
@@ -211,7 +213,7 @@ export function makeFreeSet(rng) {
       motion: rng.pick(['still', 'still', 'orbit', 'float']), binaural: rng.pick([6, 8, 10]), breath: rng.chance(0.2) ? 5.5 : 0, transition: 20,
       events: [{ t: 1, type: rng.pick(['bowl', 'koshi', 'tingsha', 'shimmer', 'rainstick', 'crystal', 'monochord', 'chimes']) }, { t: rng.int(90, 180), type: rng.pick(['crystal', 'fork', 'monochord', 'overtone', 'templeBell', 'belltree']) }],
       cue: 'Свободная атмосфера. Ведите голосом, добавляйте звуки вживую — пространство само медленно меняется.',
-      script: [[6, rng.pick(FREE_LINES)], [rng.int(70, 110), rng.pick(FREE_LINES)], [rng.int(150, 190), rng.pick(FREE_LINES)]],
+      script: [[6, line()], [rng.int(70, 110), line()], [rng.int(150, 190), line()]],
     });
     at += rng.int(200, 340);
   }

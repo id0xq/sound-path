@@ -18,6 +18,7 @@ import { Improv } from './improv.js';
 import { Fauna } from './fauna.js';
 import { Field } from './field.js';
 import { Piano } from './piano.js';
+import { Path } from './path.js';
 
 export class App {
   async init(onProgress) {
@@ -37,6 +38,7 @@ export class App {
     this.fauna = new Fauna(this);
     this.field = new Field(this); this.birds.field = this.field;
     this.piano = new Piano(this);
+    this.path = new Path(this);
     this.gen = new Generators(this);
     this.voice = new Voice(E);
     this.narrator = new Narrator(this);

@@ -10,6 +10,7 @@ import { Sphere, KIND_COLORS } from './sphere.js';
 import { fmtTime, noteName, tuning as A4, clamp } from './util.js';
 import { Breathwork, PROGRAMS } from './breath.js';
 import { Builder } from './builder.js';
+import { PATH_VOICES } from './path.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -52,7 +53,7 @@ function boot() {
   sphere = new Sphere($('#dome'), app);
   buildSpaces(); buildSets(); buildPads(); buildHang(); bindHang(); buildMixer(); bindVoice(); bindRecorder(); bindSettings(); bindPlacement(); bindKeys();
   app.breathwork = new Breathwork(app);
-  bindLines(); bindNarrator(); bindHead(); bindViz(); bindTabs(); bindBreath(); bindBuilder(); bindMedia(); bindWaves();
+  bindLines(); bindNarrator(); bindHead(); bindViz(); bindTabs(); bindBreath(); bindBuilder(); bindMedia(); bindWaves(); bindPath();
 
   C.on('load', renderSet);
   C.on('chapter', ({ idx, ch }) => {
@@ -70,7 +71,10 @@ function boot() {
     if (app.recorder.active && recWithSet) setTimeout(() => stopRecording(), 2500);
     releaseWake();
   });
-  E.onSpace = (name) => $$('.space-chip').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.space === name)));
+  E.onSpace = (name) => {
+    $$('.space-opt').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.space === name)));
+    $('#spaceName').textContent = (SPACES[name] && SPACES[name].name) || name;
+  };
   E.onSpace(E.spaceName);
 
   const seed = Math.floor(Math.random() * 9000) + 1000;
@@ -83,33 +87,40 @@ function boot() {
 
 // ---------- Пространства ----------
 function buildSpaces() {
-  const box = $('#spaces'); box.innerHTML = '';
-  for (const [k, s] of Object.entries(SPACES)) {
+  const box = $('#spaces'), btn = $('#spaceBtn'); box.innerHTML = '';
+  for (const [k, sp] of Object.entries(SPACES)) {
     const b = document.createElement('button');
-    b.className = 'space-chip'; b.dataset.space = k; b.textContent = s.name; b.title = s.hint; b.setAttribute('role', 'radio');
-    b.addEventListener('click', () => app.E.setSpace(k, 4));
+    b.className = 'space-opt'; b.dataset.space = k; b.setAttribute('role', 'radio');
+    b.innerHTML = '<span class="dot"></span><span class="n"></span><span class="h"></span>';
+    b.querySelector('.n').textContent = sp.name; b.querySelector('.h').textContent = sp.hint;
+    b.addEventListener('click', () => { app.E.setSpace(k, 4); close(); });
     box.appendChild(b);
   }
+  const close = () => { box.hidden = true; btn.setAttribute('aria-expanded', 'false'); };
+  btn.addEventListener('click', (e) => { e.stopPropagation(); const open = box.hidden; box.hidden = !open; btn.setAttribute('aria-expanded', String(open)); });
+  document.addEventListener('click', (e) => { if (!box.hidden && !box.contains(e.target)) close(); });
+  window.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
 }
 
 // ---------- Сеты ----------
 function buildSets() {
-  const box = $('#setPicker'); box.innerHTML = '';
+  const sel = $('#setSelect'); sel.innerHTML = '';
   const all = [...SETS, { id: 'free', group: 'Свободно', title: 'Свободная атмосфера', subtitle: 'Бесконечный поток, каждый раз новый', minutes: 0 }];
-  let group = null;
-  for (const s of all) {
-    if (s.group && s.group !== group) { group = s.group; const h = document.createElement('h4'); h.className = 'set-group'; h.textContent = group; box.appendChild(h); }
-    const b = document.createElement('button');
-    b.className = 'set-opt'; b.dataset.id = s.id; b.setAttribute('role', 'radio'); b.setAttribute('aria-checked', String(s.id === setId));
-    b.innerHTML = `<span class="t"></span><span class="m"></span><span class="s"></span>`;
-    b.querySelector('.t').textContent = s.title; b.querySelector('.m').textContent = s.minutes ? s.minutes + ' мин' : '∞'; b.querySelector('.s').textContent = s.subtitle;
-    b.addEventListener('click', () => {
-      if (app.conductor.running && !confirm('Сейчас идёт сет. Завершить его и выбрать другой?')) return;
-      setId = s.id; $$('.set-opt').forEach((x) => x.setAttribute('aria-checked', String(x.dataset.id === s.id)));
-      app.conductor.load(s.id, Number($('#seed').value) || 1);
-    });
-    box.appendChild(b);
+  const groups = {};
+  for (const st of all) {
+    const g = groups[st.group || 'Сеты'] || (groups[st.group || 'Сеты'] = Object.assign(document.createElement('optgroup'), { label: st.group || 'Сеты' }));
+    const o = document.createElement('option'); o.value = st.id; o.textContent = st.title + (st.minutes ? ' · ' + st.minutes + ' мин' : ' · ∞');
+    g.appendChild(o);
   }
+  Object.values(groups).forEach((g) => sel.appendChild(g));
+  sel.value = setId;
+  const desc = () => { const st = all.find((x) => x.id === sel.value); $('#setDesc').textContent = st ? st.subtitle : ''; };
+  desc();
+  sel.addEventListener('change', () => {
+    if (app.conductor.running && !confirm('Сейчас идёт сет. Завершить его и выбрать другой?')) { sel.value = setId; return; }
+    setId = sel.value; desc();
+    app.conductor.load(setId, Number($('#seed').value) || 1);
+  });
   $('#playBtn').addEventListener('click', () => startSet(false));
   $('#guidedBtn').addEventListener('click', () => startSet(true));
   $('#holdBtn').addEventListener('click', () => app.conductor.hold());
@@ -293,7 +304,7 @@ function buildHang() {
   const svg = $('#hang'); if (!svg || !app.live) return;
   const notes = app.live.notes();
   const n = notes.length - 1;
-  const parts = [`<defs><radialGradient id="hangShell" cx="40%" cy="35%" r="75%"><stop offset="0%" stop-color="#6d8796"/><stop offset="55%" stop-color="#344b5a"/><stop offset="100%" stop-color="#16242e"/></radialGradient></defs>`,
+  const parts = [`<defs><radialGradient id="hangShell" cx="40%" cy="35%" r="75%"><stop offset="0%" stop-color="#9a93bd"/><stop offset="55%" stop-color="#55507a"/><stop offset="100%" stop-color="#2a2742"/></radialGradient></defs>`,
     '<circle class="shell" r="108"/>'];
   const pos = [];
   for (let i = 0; i < n; i++) {
@@ -441,7 +452,7 @@ function bindVoice() {
   });
   function save() { store.set('voice', V.settings); }
   $('#micBtn').addEventListener('click', async () => {
-    if (V.enabled) { V.disable(); $('#micBtn').textContent = 'Включить микрофон'; $('#micState').textContent = 'Микрофон выключен'; $('#micMeter').style.width = '0'; return; }
+    if (V.enabled) { V.disable(); $('#micBtn').textContent = 'Включить'; $('#micState').textContent = 'Микрофон выключен'; $('#micMeter').style.width = '0'; return; }
     try {
       $('#micState').textContent = 'Разрешите доступ к микрофону…';
       await V.enable($('#micSelect').value || undefined);
@@ -520,15 +531,17 @@ function escapeHtml(s) { return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<
 function renderLine({ idx, manual } = {}) {
   const C = app.conductor, L = C.lines;
   const i = idx ?? C.shownLine;
-  const cur = L[i], prev = L[i - 1];
+  const cur = L[i];
   const el = $('#cueText');
-  const text = cur ? cur.text : (C.set && !C.running ? 'Нажмите «Медитация с голосом» — ведущий проведёт всё сам. Или «Вести самому» — тогда эти слова будут подсказками для вас.' : '');
+  const text = cur ? cur.text : (C.set && !C.running ? 'Нажмите «Начать сет» — здесь появятся слова для проводника. Их можно листать вперёд и назад.' : '');
   if (el.textContent !== text) {
     el.classList.add('fade');
     setTimeout(() => { el.textContent = text; el.classList.remove('fade'); }, manual ? 60 : 380);
   }
-  $('#cuePrev').textContent = prev ? prev.text : '';
-  $('#cueCount').textContent = L.length ? `${Math.max(0, i + 1)} из ${L.length}${C.viewIdx !== null ? ', вручную: нажмите, чтобы вернуться' : ''}` : '';
+  const next = L[i + 1];
+  $('#cuePrev').textContent = next ? 'Следом: ' + next.text : '';
+  const ahead = C.viewIdx !== null && C.viewIdx > C.lineIdx, behind = C.viewIdx !== null && C.viewIdx < C.lineIdx;
+  $('#cueCount').textContent = L.length ? `${Math.max(0, i + 1)} из ${L.length}${ahead ? ' · вы впереди сюжета' : behind ? ' · нажмите, чтобы вернуться к сюжету' : ''}` : '';
   $('#linePrev').disabled = i <= 0; $('#lineNext').disabled = i >= L.length - 1;
 }
 function bindLines() {
@@ -618,7 +631,7 @@ function bindHead() {
 
 // ---------- Виды визуализации ----------
 function bindViz() {
-  const saved = store.get('viz', 'dome');
+  let saved = store.get('viz', 'dome'); if (!['dome', 'field', 'lissajous', 'chladni'].includes(saved)) saved = 'dome';
   const set = (m) => { sphere.setMode(m); $$('#vizModes button').forEach((x) => x.setAttribute('aria-checked', String(x.dataset.viz === m))); store.set('viz', m); };
   $$('#vizModes button').forEach((b) => b.addEventListener('click', () => set(b.dataset.viz)));
   set(saved);
@@ -628,8 +641,74 @@ function bindViz() {
 function bindTabs() {
   $$('#modeTabs button').forEach((b) => b.addEventListener('click', () => {
     $$('#modeTabs button').forEach((x) => { const on = x === b; x.setAttribute('aria-checked', String(on)); x.setAttribute('aria-selected', String(on)); });
-    $('#tabSets').hidden = b.dataset.tab !== 'sets'; $('#tabBreath').hidden = b.dataset.tab !== 'breath';
+    showTab(b.dataset.tab);
   }));
+  // центр: звук вокруг или ханг
+  const view = (v) => {
+    $$('#stageSwitch button').forEach((x) => x.setAttribute('aria-checked', String(x.dataset.view === v)));
+    $('#viewSpace').hidden = v !== 'space'; $('#viewHang').hidden = v !== 'hang'; $('#vizModes').hidden = v !== 'space';
+    store.set('stage', v); if (v === 'space') sphere.resize();
+  };
+  $$('#stageSwitch button').forEach((b) => b.addEventListener('click', () => view(b.dataset.view)));
+  view(store.get('stage', 'space'));
+  // звуки: инструменты, звукотерапия, сердце
+  $$('#soundTabs button').forEach((b) => b.addEventListener('click', () => {
+    $$('#soundTabs button').forEach((x) => { const on = x === b; x.setAttribute('aria-checked', String(on)); x.setAttribute('aria-selected', String(on)); });
+    $$('#soundsCard [data-st]').forEach((el) => { if (el.tagName !== 'BUTTON') el.hidden = el.dataset.st !== b.dataset.st; });
+  }));
+  // на телефоне блоки свёрнуты — открываются по касанию
+  if (window.matchMedia('(max-width: 820px)').matches) ['#voiceCard', '#recCard', '#soundsCard'].forEach((id) => { $(id).open = false; });
+}
+function showTab(tab) {
+  $$('#modeTabs button').forEach((x) => { const on = x.dataset.tab === tab; x.setAttribute('aria-checked', String(on)); x.setAttribute('aria-selected', String(on)); });
+  $('#tabSets').hidden = tab !== 'sets'; $('#tabBreath').hidden = tab !== 'breath'; $('#tabPath').hidden = tab !== 'path';
+  $('#panelTitle').textContent = { sets: 'Сет', breath: 'Дыхание', path: 'Путь' }[tab];
+  $('#modePanel').open = true;
+  $$('#micMode button').forEach((x) => x.setAttribute('aria-checked', String(x.dataset.mic === (tab === 'path' ? 'path' : 'voice'))));
+}
+
+// ---------- Путь: мир через микрофон превращается в музыку ----------
+function bindPath() {
+  const P = app.path, V = app.voice;
+  const tSel = $('#pathTuning'), rSel = $('#pathRoot'), vSel = $('#pathVoice');
+  for (const [k, t] of Object.entries(TUNINGS)) tSel.appendChild(Object.assign(document.createElement('option'), { value: k, textContent: t.name + ' — ' + t.mood }));
+  ['до', 'до♯', 'ре', 'ре♯', 'ми', 'фа', 'фа♯', 'соль', 'соль♯', 'ля', 'ля♯', 'си'].forEach((n, i) => rSel.appendChild(Object.assign(document.createElement('option'), { value: 48 + i, textContent: n })));
+  for (const [k, n] of Object.entries(PATH_VOICES)) vSel.appendChild(Object.assign(document.createElement('option'), { value: k, textContent: n }));
+  const saved = store.get('path', {});
+  tSel.value = saved.tuning || 'amara'; rSel.value = saved.root || 50; vSel.value = saved.voice || 'handpan';
+  const opts = () => ({ tuning: tSel.value, root: Number(rSel.value), voice: vSel.value, melody: Number($('#pathMelody').value), drone: Number($('#pathDrone').value), space: app.E.spaceName || 'cloud' });
+  const save = () => store.set('path', { tuning: tSel.value, root: rSel.value, voice: vSel.value });
+  [tSel, rSel].forEach((el) => el.addEventListener('change', () => { save(); P.update(opts()); }));
+  vSel.addEventListener('change', () => { save(); P.opts.voice = vSel.value; });
+  $('#pathMelody').addEventListener('input', (e) => { P.opts.melody = Number(e.target.value); });
+  $('#pathDrone').addEventListener('input', (e) => { P.update({ drone: Number(e.target.value) }); });
+  $('#pathTransform').addEventListener('input', (e) => V.set('pathTransform', Number(e.target.value)));
+  $('#pathAtmos').addEventListener('input', (e) => V.set('pathAtmos', Number(e.target.value)));
+  $('#pathDry').addEventListener('input', (e) => V.set('pathDry', Number(e.target.value)));
+  const sync = () => { $('#pathStart').disabled = P.active; $('#pathStop').disabled = !P.active; $('#playBtn').disabled = P.active || app.conductor.running; };
+  P.onNote = (name) => { $('#pathHint').textContent = 'Мир звучит: ' + name; };
+  $('#pathStart').addEventListener('click', async () => {
+    if (app.conductor.running && !confirm('Сейчас идёт сет. Завершить его и начать путь?')) return;
+    if (app.breathwork.active) app.breathwork.stop(true);
+    $('#pathHint').textContent = 'Включаю микрофон… Наденьте наушники.';
+    try {
+      await P.start(opts(), $('#micSelect').value || undefined);
+      $('#micBtn').textContent = 'Выключить';
+      $('#pathHint').textContent = 'Слушаю мир. Говорите, дышите, идите — всё превращается в музыку.';
+      if (recWithSet && !app.recorder.active) startRecording();
+      requestWake();
+    } catch (e) { $('#pathHint').textContent = 'Микрофон не включился: ' + e.message; }
+    sync();
+  });
+  $('#pathStop').addEventListener('click', () => { P.stop(); $('#pathHint').textContent = 'Путь завершён.'; if (app.recorder.active && recWithSet) setTimeout(() => stopRecording(), 6500); sync(); });
+  $('#pathFreeze').addEventListener('click', () => app.E.dissolve(12));
+  // режим микрофона в карточке голоса
+  $$('#micMode button').forEach((b) => b.addEventListener('click', () => {
+    if (b.dataset.mic === 'path') showTab('path');
+    else { if (P.active) { P.stop(); sync(); } V.set('mode', 'voice'); showTab('sets'); }
+  }));
+  app.conductor.on('load', (set) => { if (P.active && set.id !== 'path') { P.active = false; clearInterval(P.timer); V.set('mode', 'voice'); sync(); } });
+  sync();
 }
 
 // ---------- Дыхательные практики ----------
@@ -643,19 +722,14 @@ function bindBreath() {
     if (app.breathwork) app.breathwork.opts.sound = bwSound;
   }));
   $$('#bwSound button').forEach((x) => x.setAttribute('aria-checked', String(x.dataset.sound === bwSound)));
-  const B = app.breathwork, list = $('#breathList');
+  const B = app.breathwork, list = $('#breathSelect');
+  PROGRAMS.forEach((P) => list.appendChild(Object.assign(document.createElement('option'), { value: P.id, textContent: P.name + ' · ' + P.rhythm })));
+  list.addEventListener('change', () => { breathId = list.value; render(); });
   const render = () => {
-    list.innerHTML = '';
-    PROGRAMS.forEach((P) => {
-      const b = document.createElement('button');
-      b.className = 'breath-opt'; b.setAttribute('role', 'radio'); b.setAttribute('aria-checked', String(P.id === breathId));
-      b.innerHTML = '<span class="t"></span><span class="m"></span><span class="s"></span>';
-      b.querySelector('.t').textContent = P.name; b.querySelector('.m').textContent = P.rhythm; b.querySelector('.s').textContent = P.goal;
-      b.addEventListener('click', () => { breathId = P.id; render(); });
-      list.appendChild(b);
-    });
+    list.value = breathId;
     const P = PROGRAMS.find((p) => p.id === breathId), box = $('#breathDetail');
     box.innerHTML = '';
+    const pg = document.createElement('p'); pg.textContent = P.goal; pg.style.fontWeight = '500'; box.appendChild(pg);
     const pa = document.createElement('p'); pa.textContent = P.about; box.appendChild(pa);
     if (P.intense) {
       const w = document.createElement('p'); w.className = 'warn';
