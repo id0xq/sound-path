@@ -12,6 +12,8 @@ import { NOTE_NAMES } from './util.js';
 import { STYLES, STYLE_NAMES } from './groove.js';
 import { KIT_NAMES } from './sampler.js';
 import { ANIMALS } from './fauna.js';
+import { PIANO_STYLES } from './piano.js';
+import { LEADS } from './improv.js';
 
 const opt = (o) => Object.entries(o).map(([v, l]) => ({ v, l: typeof l === 'string' ? l : l.name }));
 const CHORDS = {
@@ -43,7 +45,10 @@ export const BLOCKS = [
     fields: [{ k: 'binaural', type: 'select', label: 'Частота биений', options: [[4, '4 Гц, тета'], [6, '6 Гц, тета'], [8, '8 Гц, альфа'], [10, '10 Гц, альфа'], [12, '12 Гц, альфа']].map(([v, l]) => ({ v: String(v), l })) }] },
   { id: 'breath', name: 'Дыхание атмосферы', cat: 'Атмосфера', color: '#cfc2ff', on: 'breath',
     fields: [{ k: 'breath', type: 'select', label: 'Вдохов в минуту', options: [4, 4.5, 5, 5.5, 6, 7].map((v) => ({ v: String(v), l: String(v).replace('.', ',') })) }] },
-  { id: 'handpan', name: 'Ханг', cat: 'Инструменты', color: KIND_COLORS.handpan, on: 'handpan', fields: [lvl('handpan', 'Сколько играет')] },
+  { id: 'handpan', name: 'Импровизация квадратами', cat: 'Инструменты', color: KIND_COLORS.handpan, on: 'handpan',
+    fields: [{ k: 'lead', type: 'select', label: 'Солист', options: Object.entries(LEADS).map(([v, x]) => ({ v, l: x.name })) }, lvl('handpan', 'Сколько играет')] },
+  { id: 'piano', name: 'Фортепиано', cat: 'Инструменты', color: KIND_COLORS.piano, on: 'piano',
+    fields: [{ k: 'pianoStyle', type: 'select', label: 'Манера', options: opt(PIANO_STYLES) }, lvl('piano', 'Сколько играет')] },
   { id: 'bells', name: 'Колокольчики', cat: 'Инструменты', color: KIND_COLORS.bells, on: 'bells', fields: [lvl('bells', 'Как часто')] },
   { id: 'ocarina', name: 'Окарина', cat: 'Инструменты', color: KIND_COLORS.ocarina, on: 'ocarina', fields: [lvl('ocarina', 'Как часто')] },
   { id: 'kalimba', name: 'Калимба', cat: 'Инструменты', color: KIND_COLORS.kalimba, on: 'kalimba', fields: [lvl('kalimba', 'Как часто')] },
@@ -67,7 +72,7 @@ export const BLOCKS = [
     on: 'fauna.' + k, fields: [lvl('fauna.' + k, k === 'cat' || k === 'cicadas' ? 'Громкость' : 'Как часто', 1)],
   })),
 ];
-const DEF_ON = { 'groove.style': 'lofi', underwater: 0.6, 'pad.level': 0.28, wash: 0.25, tanpura: 0.3, binaural: 8, breath: 5.5, handpan: 0.3, bells: 0.2, ocarina: 0.25, kalimba: 0.15, healEvery: 90, rhythm: 'heartwalk', birds: 0.35 };
+const DEF_ON = { piano: 0.45, 'groove.style': 'lofi', underwater: 0.6, 'pad.level': 0.28, wash: 0.25, tanpura: 0.3, binaural: 8, breath: 5.5, handpan: 0.3, bells: 0.2, ocarina: 0.25, kalimba: 0.15, healEvery: 90, rhythm: 'heartwalk', birds: 0.35 };
 
 const get = (o, path) => path.split('.').reduce((a, k) => (a == null ? a : a[k]), o);
 const set = (o, path, v) => { const ks = path.split('.'); let a = o; ks.slice(0, -1).forEach((k) => { a[k] = a[k] && typeof a[k] === 'object' ? a[k] : {}; a = a[k]; }); a[ks[ks.length - 1]] = v; };

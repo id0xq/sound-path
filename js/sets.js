@@ -14,6 +14,7 @@ export const DEFAULTS = {
   nature: { wind: 0, leaves: 0, stream: 0, waves: 0, rain: 0, crickets: 0, fire: 0, dawn: 0, woodland: 0, meadow: 0, cave: 0, cityrain: 0 },
   rhythm: null, tempo: 66, rhythmLevel: 0.6,
   groove: null, grooveLevel: 0.8, fauna: {}, underwater: 0,
+  piano: 0, pianoStyle: 'einaudi', lead: 'handpan',
   binaural: 8, breath: 0, motion: 'still',
   color: '#7fc4c0', transition: 14, events: [],
 };
@@ -48,7 +49,7 @@ export const SETS = [
         cue: 'Начинаем движение. Каждый шаг — на мягкий удар барабана. Внимание в стопах: пятка, середина, носок. Дыхание свободное, взгляд мягкий.',
       },
       {
-        at: 480, title: 'Ручей', color: '#79c3d6',
+        at: 480, title: 'Ручей', color: '#79c3d6', lead: 'kalimba',
         space: 'forest', spaceMix: 0.55, tuning: 'amara', chord: [-12, 0, 7, 10, 15],
         pad: { timbre: 'warm', level: 0.22 }, wash: 0.18, handpan: 0.32, ocarina: 0.35, bells: 0.05,
         birds: 0.55, species: ['thrush', 'robin', 'cuckoo', 'blackbird', 'chaffinch', 'distant'],
@@ -68,7 +69,7 @@ export const SETS = [
         cue: 'Остановитесь. Поднимите взгляд. Пространство раскрывается — услышьте, как звон кружит над головой. Вдохните, будто вдыхаете свет. Можно на минуту закрыть глаза и просто слушать птиц.',
       },
       {
-        at: 1140, title: 'Тропа сердца', color: '#e59a7c',
+        at: 1140, title: 'Тропа сердца', color: '#e59a7c', lead: 'tongue',
         space: 'forest', spaceMix: 0.6, tuning: 'kurd', chord: [-12, 0, 7, 12, 15],
         pad: { timbre: 'warm', level: 0.26 }, wash: 0.2, handpan: 0.45, ocarina: 0.2, kalimba: 0.15, bells: 0.08,
         birds: 0.45, species: ['cuckoo', 'thrush', 'dove', 'wren', 'distant'],
@@ -78,7 +79,7 @@ export const SETS = [
         cue: 'Снова в путь, чуть бодрее. Ритм становится живым — позвольте телу самому найти шаг. С каждым шагом мысленно говорите: «я здесь». Почувствуйте, как бьётся сердце.',
       },
       {
-        at: 1500, title: 'Возвращение', color: '#b5a7d6',
+        at: 1500, title: 'Возвращение', color: '#b5a7d6', piano: 0.3, pianoStyle: 'nocturne',
         space: 'forest', spaceMix: 0.6, tuning: 'amara', chord: [-12, 0, 7, 12],
         pad: { timbre: 'warm', level: 0.3 }, wash: 0.25, handpan: 0.18, bells: 0.06,
         birds: 0.4, species: ['robin', 'dove', 'distant'],
@@ -133,7 +134,7 @@ export const SETS = [
         cue: 'Поблагодарите своё тело. Стопы, которые вас носят. Руки, которые обнимают. Сердце, которое бьётся не переставая. Пройдите вниманием по телу и в каждом месте скажите про себя «спасибо».',
       },
       {
-        at: 1020, title: 'Благодарность людям', color: '#d7a0a0',
+        at: 1020, title: 'Благодарность людям', color: '#d7a0a0', piano: 0.5, pianoStyle: 'einaudi',
         space: 'fog', spaceMix: 0.62, tuning: 'astra', chord: [-15, -3, 4, 9, 12],
         pad: { timbre: 'warm', level: 0.28 }, handpan: 0.3, wash: 0.25, ocarina: 0.45, bells: 0.1,
         birds: 0.1, species: ['dove', 'distant'], rhythm: 'cradle', tempo: 54, rhythmLevel: 0.4,
@@ -141,7 +142,7 @@ export const SETS = [
         cue: 'Вспомните людей, благодаря которым вы здесь: родителей, учителей, друзей. Увидьте их лица. Звуки приходят с разных сторон — как голоса тех, кто вас любит. Каждому мысленно скажите: «спасибо, что ты есть».',
       },
       {
-        at: 1440, title: 'Любовь', color: '#f0a7c4',
+        at: 1440, title: 'Любовь', color: '#f0a7c4', piano: 0.35, pianoStyle: 'frahm',
         space: 'cloud', spaceMix: 0.7, tuning: 'lydian', chord: [-12, 0, 7, 11, 16, 18],
         pad: { timbre: 'choir', level: 0.3 }, handpan: 0.5, wash: 0.45, bells: 0.35, kalimba: 0.15,
         rhythm: 'heartGroove', tempo: 64, rhythmLevel: 0.42, motion: 'orbit', binaural: 10,
@@ -157,7 +158,7 @@ export const SETS = [
         cue: 'Растворитесь. Любовь как океан: в ней нет границы между вами и миром. Ничего не нужно делать — просто будьте. Дайте звуку говорить, сделайте длинную паузу.',
       },
       {
-        at: 2280, title: 'Отдать миру', color: '#f2d27e',
+        at: 2280, title: 'Отдать миру', color: '#f2d27e', lead: 'lyre',
         space: 'temple', spaceMix: 0.6, tuning: 'astra', chord: [-12, 0, 7, 12, 16],
         pad: { timbre: 'warm', level: 0.3 }, handpan: 0.35, wash: 0.25, ocarina: 0.2, bells: 0.25,
         birds: 0.5, species: ['robin', 'blackbird', 'oriole', 'dove', 'nightingale'], nature: { stream: 0.2, dawn: 0.35 },
@@ -206,6 +207,7 @@ export function makeFreeSet(rng) {
       rhythm: rng.chance(0.3) ? rng.pick(['heartbeat', 'pulse', 'cradle', 'heartwalk']) : null, tempo: rng.int(54, 72), rhythmLevel: 0.4,
       groove: rng.chance(0.12) ? { style: 'ambient', energy: rng.range(0.25, 0.45), lead: 0.3 } : null, grooveLevel: 0.6,
       fauna: rng.pick([{}, {}, {}, { whales: 0.4 }, { owls: 0.4 }, { frogs: 0.35 }, { dolphins: 0.3 }, { woodpecker: 0.3 }, { loon: 0.4 }, { bees: 0.5 }]),
+      lead: rng.pick(['handpan', 'handpan', 'piano', 'tongue', 'kalimba', 'lyre']), piano: rng.chance(0.3) ? rng.range(0.25, 0.5) : 0, pianoStyle: rng.pick(['einaudi', 'frahm', 'nocturne']),
       motion: rng.pick(['still', 'still', 'orbit', 'float']), binaural: rng.pick([6, 8, 10]), breath: rng.chance(0.2) ? 5.5 : 0, transition: 20,
       events: [{ t: 1, type: rng.pick(['bowl', 'koshi', 'tingsha', 'shimmer', 'rainstick', 'crystal', 'monochord', 'chimes']) }, { t: rng.int(90, 180), type: rng.pick(['crystal', 'fork', 'monochord', 'overtone', 'templeBell', 'belltree']) }],
       cue: 'Свободная атмосфера. Ведите голосом, добавляйте звуки вживую — пространство само медленно меняется.',

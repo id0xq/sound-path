@@ -20,7 +20,7 @@ export class Conductor {
     this.state = merge(DEFAULTS, {});
     this.running = false; this.held = false; this.elapsed = 0; this.lastNow = 0; this.chapterIdx = -1;
     this.ding = 50; this.curDing = 50; this.tempoFactor = 1;
-    this.D = { handpan: 0, wash: 0, bells: 0, ocarina: 0, kalimba: 0, birds: 0 };
+    this.D = { handpan: 0, wash: 0, bells: 0, ocarina: 0, kalimba: 0, birds: 0, piano: 0 };
     this.T = { ...this.D }; this.smoothTau = 6;
     this.pad = null; this.pendingEvents = []; this.handlers = {};
     this.fadingOut = false;
@@ -46,6 +46,7 @@ export class Conductor {
     this.lines = [];
     this.set.chapters.forEach((ch, ci) => (ch.script || []).forEach(([t, text, ping], li) => this.lines.push({ at: ch.at + t, text, ci, li, key: `c${ci}l${li}`, ping })));
     this.lineIdx = -1; this.viewIdx = null;
+    if (this.app.field) this.app.field.preloadFor(this.set);
     this.emit('load', this.set);
     this.emit('line', { idx: -1 });
   }
@@ -74,7 +75,7 @@ export class Conductor {
     this.running = true; this.held = false; this.fadingOut = false; this.lastNow = now;
     E.musicSum.gain.cancelScheduledValues(now);
     E.musicSum.gain.setValueAtTime(0, now); E.musicSum.gain.linearRampToValueAtTime(1, now + 6);
-    this.app.gen.reset(now); this.app.improv.reset();
+    this.app.gen.reset(now); this.app.improv.reset(); this.app.piano.reset();
     this.applyChapter(this.chapterIndexAt(this.elapsed), 3, true);
     this.emit('state');
   }
@@ -167,7 +168,7 @@ export class Conductor {
       this._rhythmOffAt = E.now + fade;
     }
 
-    this.T = { handpan: S.handpan, wash: S.wash, bells: S.bells, ocarina: S.ocarina, kalimba: S.kalimba, birds: S.birds };
+    this.T = { handpan: S.handpan, wash: S.wash, bells: S.bells, ocarina: S.ocarina, kalimba: S.kalimba, birds: S.birds, piano: S.piano || 0 };
     this.smoothTau = Math.max(2, fade / 2);
     A.voice.setScale(scaleInRange(S.tuning, ding, ding, ding + 30));
 

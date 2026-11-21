@@ -20,6 +20,21 @@ const CELLS = {
 };
 const CORNERS = [-45, 45, 135, -135];
 
+// Солист импровизации: ханг или другие инструменты (живые записи в строе сета); если запись ещё грузится — ханг
+const viaField = (name, shift, extra = {}) => (app, dest, t, m, vel, len, d) => {
+  const end = app.field ? app.field.tuned(dest, t, name, m + shift, { vel: vel * (extra.gain || 1), dur: extra.sustain ? Math.max(len * 1.3, extra.sustain) : undefined, rel: extra.rel ?? 0.4, att: extra.att ?? 0.008 }) : null;
+  return end ?? I.handpan(app.E, dest, t, { freq: mtof(m), vel, bright: 0.35 + d * 0.3 });
+};
+export const LEADS = {
+  handpan: { name: 'Ханг', kind: 'handpan', label: 'ханг', play: (app, dest, t, m, vel, len, d) => I.handpan(app.E, dest, t, { freq: mtof(m), vel, bright: 0.35 + d * 0.3 }) },
+  piano: { name: 'Фортепиано', kind: 'piano', label: 'фортепиано', send: 0.3, play: (app, dest, t, m, vel, len) => app.piano.note(dest, t, m + 12, vel * 0.85, Math.max(0.8, len * 1.8), 0.9) },
+  tongue: { name: 'Глюкофон', kind: 'kalimba', label: 'глюкофон', play: viaField('tongue', 0, { gain: 1.1 }) },
+  kalimba: { name: 'Калимба', kind: 'kalimba', label: 'калимба', play: viaField('kalimba', 12, { gain: 0.9 }) },
+  lyre: { name: 'Лира', kind: 'ocarina', label: 'лира', play: viaField('lyre', 0, { sustain: 2.5, rel: 1 }) },
+  ocarina: { name: 'Окарина', kind: 'ocarina', label: 'окарина', send: 0.4, play: viaField('ocarina', 12, { gain: 0.7, sustain: 0.4, att: 0.04, rel: 0.2 }) },
+  glass: { name: 'Поющее стекло', kind: 'bells', label: 'стекло', send: 0.5, play: viaField('glass', 24, { gain: 1.2, sustain: 3, att: 0.5, rel: 1.5 }) },
+};
+
 export class Improv {
   constructor(app) {
     this.app = app; this.E = app.E;
@@ -38,7 +53,7 @@ export class Improv {
 
   // Без ритма — свой неслышный пульс: такты по четыре доли в темпе главы
   tick(now, horizon, S) {
-    const d = this.density();
+    const d = Math.max(this.density(), this.app.piano ? this.app.piano.density() : 0);
     if (d < 0.02) { this.freeNext = 0; return; }
     if (this.app.groove.active || this.app.rhythm.active) { this.freeNext = 0; return; }
     if (!this.freeNext || this.freeNext < now) this.freeNext = now + 0.3;
@@ -79,6 +94,7 @@ export class Improv {
 
   // Такт: какую часть квадрата играем
   onBar(t, info) {
+    if (this.app.piano) this.app.piano.onBar(t, info);   // фортепиано идёт по тем же тактам
     const d = this.density();
     if (d < 0.02 || !this.C.running) return;
     const E = this.E, r = this.rng, N = this.C.handpanNotes(), L = N.length, spb = info.spb === 3 ? 3 : 4;
@@ -119,7 +135,8 @@ export class Improv {
     const az0 = CORNERS[q] + this.rot, az1 = CORNERS[(q + 1) % 4] + this.rot;
     const dist = info.source === 'groove' ? r.range(1.5, 1.9) : r.range(1.6, 2.2);
     const p0 = polar(az0, r.range(-6, 10), dist);
-    const em = E.spawn({ group: 'instr', pos: p0, send: 0.24, kind: 'handpan', label: 'ханг' });
+    const lead = LEADS[this.C.state.lead] || LEADS.handpan;
+    const em = E.spawn({ group: 'instr', pos: p0, send: lead.send ?? 0.24, kind: lead.kind, label: lead.label });
     const barDur = sd * stepsInBar;
     const mid = (az1 - az0 + 540) % 360 - 180;
     em.path([{ t, pos: p0 }, { t: t + barDur * 1.6, pos: polar(az0 + mid * 0.35, r.range(-4, 12), dist) }]);
@@ -132,12 +149,12 @@ export class Improv {
       let i = strong && !n.cad ? snap(n.i) : n.i;
       const tt = t + n.s * sd + swing(n.s) + (Math.random() - 0.5) * 0.01;
       const vel = (n.cad ? 0.6 : strong ? vbase : vbase * 0.75) * (n.grace ? 0.55 : 1) * (n.soft ? 0.6 : 1) * r.range(0.9, 1.08);
-      end = Math.max(end, I.handpan(E, em.input, tt, { freq: mtof(N[clamp(i, 0, L - 1)]), vel, bright: 0.35 + d * 0.3 }));
+      end = Math.max(end, lead.play(this.app, em.input, tt, N[clamp(i, 0, L - 1)], vel, n.len * sd, d));
       em.flash(tt, Math.min(0.5, n.len * sd));
       lastT = Math.max(lastT, tt);
     }
     // грув: тихие «костяшки» на слабых долях, ханг звучит как перкуссия
-    if (info.source === 'groove' && d > 0.45 && E.hp && E.hp.ready) {
+    if (info.source === 'groove' && d > 0.45 && E.hp && E.hp.ready && lead === LEADS.handpan) {
       for (let s = 1; s < stepsInBar; s += 2) if (!notes.some((n) => Math.abs(n.s - s) < 1) && Math.random() < 0.22 * d) E.hp.strike(em.input, t + s * sd + swing(s), 'knuckle', 0.18);
     }
     em.end = end; E.after(end, () => em.dispose());

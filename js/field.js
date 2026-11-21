@@ -135,7 +135,7 @@ export class Field {
   // Нота записи на нужной высоте: берём ноту записи, ближайшую по высоте, и чуть транспонируем (не больше
   // полуоктавы — тембр остаётся живым). Варианты чередуются, поэтому инструмент каждый раз звучит немного по-другому.
   // dur — сколько держать (с мягким отпуском rel), hold — тянуть дольше записи бесшовно (бурдоны).
-  tuned(dest, t, name, midi, { vel = 0.7, dur, rel = 0.4, att = 0.008, hold = false } = {}) {
+  tuned(dest, t, name, midi, { vel = 0.7, dur, rel = 0.4, att = 0.008, hold = false, exact = false } = {}) {
     const key = 'call:' + name, b = this.buf[key], M = this.meta && this.meta.calls[name];
     if (!M) return null;
     if (!b) { this.load('call', name); return null; }
@@ -145,8 +145,9 @@ export class Field {
     }).filter((c) => c.s[4] > 0);
     if (!cands.length) return null;
     const best = Math.min(...cands.map((c) => Math.abs(c.d)));
-    cands = cands.filter((c) => Math.abs(c.d) <= best + 2);
-    if (cands.length > 1) cands = cands.filter((c) => c.i !== this.sel[name]);
+    // точная нота (пианино): ближайший образец; иначе — разные варианты для живости
+    cands = cands.filter((c) => Math.abs(c.d) <= best + (exact ? 0 : 2));
+    if (!exact && cands.length > 1) cands = cands.filter((c) => c.i !== this.sel[name]);
     const c = cands[Math.floor(Math.random() * cands.length)]; this.sel[name] = c.i;
     const [off, len0, g] = c.s;
     const rate = Math.pow(2, c.d / 12) * (tuning.a4 / 440) * (1 + (Math.random() - 0.5) * 0.004);
@@ -175,6 +176,19 @@ export class Field {
     }
     this.E.noteOn && this.E.noteOn(midi, t, vel, Math.min(4, (end - t)));
     return end;
+  }
+  // Заранее подгрузить живые записи, которые понадобятся сету (чаши и гонги из событий, фортепиано, солисты)
+  preloadFor(set) {
+    const EV = { bowl: 'bowl', bowlSing: 'bowlsing', tingsha: 'tingsha', gong: 'gong', crystal: 'crystal', templeBell: 'templebell' };
+    const LEAD = { tongue: 'tongue', kalimba: 'kalimba', lyre: 'lyre', ocarina: 'ocarina', glass: 'glass' };
+    const want = new Set();
+    for (const ch of (set && set.chapters) || []) {
+      for (const e of ch.events || []) if (EV[e.type]) want.add(EV[e.type]);
+      if (ch.piano > 0 || ch.lead === 'piano') { want.add('piano1'); want.add('piano2'); }
+      if (LEAD[ch.lead]) want.add(LEAD[ch.lead]);
+      if (ch.fauna && ch.fauna.whales) want.add('whale');
+    }
+    want.forEach((n) => this.load('call', n));
   }
   count(name) { const M = this.meta && this.meta.calls[name]; return M ? M.segs.length : 0; }
   preload(names) { names.forEach(([k, n]) => this.load(k, n)); }

@@ -9,7 +9,7 @@ import { toPolar, clamp } from './util.js';
 export const KIND_COLORS = {
   handpan: '#f0d49a', bells: '#e8f6ff', bowl: '#ffe2bd', ocarina: '#b5f0d2', bird: '#fff1a8', water: '#8fe3f5',
   rhythm: '#f7b99a', heart: '#ffa9b6', rattle: '#efd9b8', wash: '#cfc2ff', gong: '#ffc99a', kalimba: '#aef3ea',
-  crickets: '#cdf3a6', fire: '#ffb08a', live: '#ffffff', instr: '#f0d49a',
+  crickets: '#cdf3a6', fire: '#ffb08a', live: '#ffffff', instr: '#f0d49a', piano: '#f6ecdc',
 };
 
 const RINGS = 8;

@@ -14,6 +14,7 @@ export const LIVE = [
   { id: 'bowl', name: 'Чаша', key: '3', kind: 'bowl' },
   { id: 'bowlSing', name: 'Поющая чаша', key: '4', kind: 'bowl' },
   { id: 'ocarina', name: 'Окарина', key: '5', kind: 'ocarina' },
+  { id: 'piano', name: 'Фортепиано', key: 'u', kind: 'piano' },
   { id: 'kalimba', name: 'Калимба', key: '6', kind: 'kalimba' },
   { id: 'rattle', name: 'Погремушка', key: '7', kind: 'rattle' },
   { id: 'rainstick', name: 'Дождевая палка', key: '8', kind: 'rattle' },
@@ -222,6 +223,13 @@ export class Live {
       const em2 = this.voice('ocarina', 'окарина', life + 3, 0.55, { far: true });
       playPhrase(end + beat, em2, notes.map((x) => ({ ...x, m: pool[Math.max(0, Math.min(pool.length - 1, pool.indexOf(x.m) + 1))] })));
     }
+  }
+
+  // ---------- Фортепиано: аккорд врассыпную, такт арпеджио или три ноты мелодии ----------
+  _piano(E) {
+    const { t, beat } = this.when(), v = this.vari('piano', 3);
+    const em = this.voice('piano', 'фортепиано', 14, 0.3, { front: true });
+    this.app.piano.phrase(em.input, t, beat, v);
   }
 
   // ---------- Калимба, глюкофон, лира ----------
