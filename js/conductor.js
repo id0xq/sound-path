@@ -109,7 +109,7 @@ export class Conductor {
     this.chapterIdx = -1;
   }
 
-  seek(idx) {
+  seek(idx, fade = 4) {
     if (!this.set) return;
     idx = Math.max(0, Math.min(this.set.chapters.length - 1, idx));
     this.elapsed = this.set.chapters[idx].at + 0.01;
@@ -118,7 +118,7 @@ export class Conductor {
     this.lineIdx = first >= 0 ? first - 1 : this.lineIndexAt(this.elapsed); this.viewIdx = null;
     if (this.app.narrator) this.app.narrator.stop();
     this.emit('line', { idx: first >= 0 ? first : this.lineIdx, seek: true });
-    if (this.running) this.applyChapter(idx, 4);
+    if (this.running) this.applyChapter(idx, fade);
     else {
       this.chapterIdx = -1; this.state = merge(DEFAULTS, this.set.chapters[idx]);
       this.curDing = this.ding + (this.state.root || 0);

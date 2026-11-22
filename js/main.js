@@ -290,8 +290,9 @@ function ui() {
     const ch = set.chapters[idx], next = set.chapters[idx + 1];
     const end = next ? next.at : set.duration;
     $('#cueTime').textContent = fmtTime(C.elapsed - ch.at) + (isFinite(end) ? ' / ' + fmtTime(end - ch.at) : '');
+    $('#cueNext').classList.toggle('go', !!(C.running && next && !C.held));
     if (C.held) $('#cueNext').textContent = 'Глава задержана — сюжет ждёт вас. Звук продолжает жить.';
-    else if (next) $('#cueNext').textContent = 'Дальше «' + next.title + '» через ' + fmtTime(next.at - C.elapsed);
+    else if (next) $('#cueNext').textContent = (C.running ? 'Перейти к «' + next.title + '» →  ' : 'Дальше «' + next.title + '» ') + 'через ' + fmtTime(next.at - C.elapsed);
     else if (isFinite(set.duration)) $('#cueNext').textContent = 'Завершение через ' + fmtTime(set.duration - C.elapsed);
     const li = $$('#chapters li')[idx];
     if (li && isFinite(end)) li.querySelector('.bar').style.transform = `scaleX(${clamp((C.elapsed - ch.at) / (end - ch.at), 0, 1)})`;
@@ -579,6 +580,12 @@ function bindLines() {
   $('#linePrev').addEventListener('click', () => app.conductor.stepLine(-1));
   $('#lineNext').addEventListener('click', () => app.conductor.stepLine(1));
   $('#cueCount').addEventListener('click', () => app.conductor.followLine());
+  // перейти к следующей главе: музыка мягко перетекает за 8–13 секунд, без резких перепадов
+  $('#cueNext').addEventListener('click', () => {
+    const C = app.conductor; if (!C.running || C.held || !C.set) return;
+    const i = C.chapterIdx + 1; if (i >= C.set.chapters.length) return;
+    C.seek(i, 8 + Math.random() * 5);
+  });
   window.addEventListener('keydown', (e) => {
     const tag = (e.target.tagName || '').toLowerCase(); if (tag === 'input' && e.target.type === 'text') return;
     if (e.key === 'ArrowLeft') { app.conductor.stepLine(-1); e.preventDefault(); }

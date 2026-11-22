@@ -437,3 +437,8 @@ details.card > summary .rec-time { margin-left: auto; margin-right: 6px; color: 
   details.card > summary, .chapters-wrap > summary { cursor: default; pointer-events: none; }
   details.card > summary::after, .chapters-wrap > summary::after { display: none; }
 }
+
+/* «Перейти к следующей главе» — тихая кнопка под суфлёром */
+.cue-next { display: block; border: 0; background: none; padding: 0; margin: 6px 0 0; min-height: 1.4em; font: inherit; font-size: 13.5px; color: var(--muted); text-align: left; cursor: default; }
+.cue-next.go { cursor: pointer; color: var(--accent); }
+.cue-next.go:hover { text-decoration: underline; text-underline-offset: 3px; }
