@@ -253,9 +253,10 @@ export class Engine {
     const ms = s / (a.length / 2);
     L.env = L.env ? L.env + (ms - L.env) * 0.12 : ms;
     const db = 10 * Math.log10(L.env + 1e-12);
-    const target = db < -55 ? 0 : clamp(-(db + 20) * 0.6, -9, 3);
-    L.gainDb += (target - L.gainDb) * 0.25;
-    this.leveler.gain.setTargetAtTime(dbToGain(L.gainDb), this.now, 1.2);
+    // тише и мягче в наушниках: цель −23 дБ, громкие всплески убираются быстрее, чем возвращаются
+    const target = db < -55 ? 0 : clamp(-(db + 23) * 0.65, -12, 1);
+    L.gainDb += (target - L.gainDb) * (target < L.gainDb ? 0.5 : 0.15);
+    this.leveler.gain.setTargetAtTime(dbToGain(L.gainDb), this.now, target < L.gainDb ? 0.4 : 1.6);
   }
 
   // Моторный цикл: двигает все источники по их путям

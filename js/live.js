@@ -51,8 +51,9 @@ export const BRAINWAVES = [
 ];
 
 // выравнивание громкости живых записей между собой (длинные звуки тише, тихие тингши громче)
-const REC_GAIN = { tingsha: 1.5, crystal: 0.4, templebell: 2.0, shaman: 0.6, ocarina: 0.7, kalimba: 0.75, glass: 1.3, bowlsing: 0.75,
-  gong: 1.8, didg: 0.65, lyre: 0.9, bowl: 0.5, tongue: 1, shruti: 0.9, rattle: 1, rainstick: 1, heart: 1 };
+const SOFT_IN = { tingsha: 0.05, bowl: 0.09, bowlsing: 0.12, crystal: 0.1 };
+const REC_GAIN = { tingsha: 1.15, crystal: 0.4, templebell: 2.0, shaman: 0.6, ocarina: 0.7, kalimba: 0.75, glass: 1.3, bowlsing: 0.62,
+  gong: 1.8, didg: 0.65, lyre: 0.9, bowl: 0.4, tongue: 1, shruti: 0.9, rattle: 1, rainstick: 1, heart: 1 };
 const rnd = (a, b) => a + Math.random() * (b - a);
 const pick = (a) => a[Math.floor(Math.random() * a.length)];
 
@@ -123,6 +124,7 @@ export class Live {
   // сыграть ноту записи; если запись ещё грузится — синтез
   rec(dest, t, name, midi, opts = {}, fallback) {
     opts = { ...opts, vel: (opts.vel ?? 0.7) * (REC_GAIN[name] ?? 1) };
+    if (SOFT_IN[name] && opts.att === undefined) opts.att = SOFT_IN[name]; // мягкий вход без щелчка удара
     const end = this.F ? (midi === null ? this.F.call(dest, t, name, opts) : this.F.tuned(dest, t, name, midi, opts)) : null;
     if (end === null || end === undefined) return fallback ? fallback() : t;
     return end;

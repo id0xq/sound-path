@@ -733,6 +733,7 @@ function bindPath() {
   $('#pathDry').addEventListener('input', (e) => V.set('pathDry', Number(e.target.value)));
   const sync = () => { $('#pathStart').disabled = P.active; $('#pathStop').disabled = !P.active; $('#playBtn').disabled = P.active || app.conductor.running; };
   P.onNote = (name) => { $('#pathHint').textContent = 'Мир звучит: ' + name; };
+  P.onKey = (r) => { rSel.value = r; save(); $('#pathHint').textContent = 'Путь перешёл в тональность ' + rSel.options[rSel.selectedIndex].text; };
   $('#pathStart').addEventListener('click', async () => {
     if (app.conductor.running && !confirm('Сейчас идёт сет. Завершить его и начать путь?')) return;
     if (app.breathwork.active) app.breathwork.stop(true);
