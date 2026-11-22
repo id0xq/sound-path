@@ -662,7 +662,7 @@ function bindHead() {
 
 // ---------- Виды визуализации ----------
 function bindViz() {
-  let saved = store.get('viz', 'dome'); if (!['dome', 'field', 'lissajous', 'chladni'].includes(saved)) saved = 'dome';
+  let saved = store.get('viz', 'dome'); if (!['dome', 'land', 'field', 'lissajous', 'chladni'].includes(saved)) saved = 'dome';
   const set = (m) => { sphere.setMode(m); $$('#vizModes button').forEach((x) => x.setAttribute('aria-checked', String(x.dataset.viz === m))); store.set('viz', m); };
   $$('#vizModes button').forEach((b) => b.addEventListener('click', () => set(b.dataset.viz)));
   set(saved);
