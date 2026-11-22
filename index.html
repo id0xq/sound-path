@@ -181,40 +181,26 @@
           <div class="mic-row"><select id="micSelect" aria-label="Микрофон"><option value="">Микрофон</option></select><button class="btn primary" id="micBtn">Включить</button></div>
           <div class="meter" aria-hidden="true"><div class="meter-fill" id="micMeter"></div></div>
           <p class="meter-state" id="micState">Микрофон выключен</p>
+          <div class="out-row">
+            <label class="out-field">Путешественник<select id="outMain" aria-label="Наушники путешественника"><option value="">Система</option></select></label>
+            <label class="out-field">Монитор проводника<select id="outMon" aria-label="Монитор проводника"><option value="">Выключен</option></select></label>
+          </div>
+          <p class="meter-state" id="outState"></p>
           <div class="sliders">
             <label>Громкость голоса <input type="range" data-voice="level" min="0" max="1.6" step="0.01" value="0.9"></label>
             <label>Разборчивость <input type="range" data-voice="clarity" min="0" max="1" step="0.01" value="0.5"></label>
             <label>Тепло <input type="range" data-voice="warmth" min="0" max="1" step="0.01" value="0.35"></label>
             <label>Ореол в паузах <input type="range" data-voice="halo" min="0" max="1" step="0.01" value="0.25"></label>
-            <label>Фон уходит под голос <input type="range" data-voice="duckDb" min="0" max="14" step="0.5" value="7"></label>
+            <label>Фон уходит под голос <input type="range" data-voice="duckDb" min="0" max="14" step="0.5" value="10"></label>
             <label>Резонанс мира <input type="range" data-voice="resonance" min="0" max="1" step="0.01" value="0"></label>
+            <label>Громкость монитора <input type="range" id="monVol" min="0" max="1.5" step="0.01" value="1"></label>
+            <label>Мой голос в мониторе <input type="range" id="monVoice" min="0" max="1" step="0.01" value="0"></label>
           </div>
           <div class="toggles">
             <label class="tog"><input type="checkbox" data-voice="monitor" checked> Слышать себя</label>
             <label class="tog"><input type="checkbox" data-voice="gate" checked> Тишина между фразами</label>
             <label class="tog"><input type="checkbox" data-voice="noiseSuppression" checked> Шумоподавление</label>
           </div>
-        </div>
-      </details>
-
-      <details class="card" id="outCard">
-        <summary><h3>Два слушателя</h3></summary>
-        <div class="card-body">
-          <p class="hint left">Путешественник слышит всё в своих наушниках, а вы с проводными наушниками слышите сюжет и атмосферу через монитор. Работает в Chrome.</p>
-          <div class="out-field">
-            <label for="outMain">Наушники путешественника</label>
-            <select id="outMain" aria-label="Наушники путешественника"><option value="">Как выбрано в системе</option></select>
-          </div>
-          <div class="out-field">
-            <label for="outMon">Монитор проводника</label>
-            <select id="outMon" aria-label="Монитор проводника"><option value="">Выключен</option></select>
-          </div>
-          <div class="sliders">
-            <label>Громкость монитора <input type="range" id="monVol" min="0" max="1.5" step="0.01" value="1"></label>
-            <label>Мой голос в мониторе <input type="range" id="monVoice" min="0" max="1" step="0.01" value="0"></label>
-          </div>
-          <p class="meter-state" id="outState"></p>
-          <button class="btn small" id="outRefresh">Обновить список устройств</button>
         </div>
       </details>
 

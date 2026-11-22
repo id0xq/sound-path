@@ -544,7 +544,7 @@ function bindOutputs() {
   async function refresh() {
     try { outs = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'audiooutput'); } catch (e) { outs = []; }
     // сохранённый выбор возвращаем, как только устройство появилось в списке (например, включили Bluetooth)
-    fill(selMain, 'Как выбрано в системе', selMain.value || saved.main || '');
+    fill(selMain, 'Система', selMain.value || saved.main || '');
     fill(selMon, 'Выключен', selMon.value || saved.mon || '');
     let ok = true;
     if (selMain.value !== applied.main) ok = (await applyMain(false)) && ok;
@@ -558,8 +558,6 @@ function bindOutputs() {
   vc.addEventListener('input', () => { E.setMonitorVoice(Number(vc.value)); saved.voice = Number(vc.value); persist(); });
   selMain.addEventListener('change', async () => { if (await applyMain(true)) report(); });
   selMon.addEventListener('change', async () => { if (await applyMon(true)) report(); });
-  $('#outRefresh').addEventListener('click', refresh);
-  $('#outCard').addEventListener('toggle', () => { if ($('#outCard').open) refresh(); });
   if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) navigator.mediaDevices.addEventListener('devicechange', refresh);
   app.refreshOutputs = refresh;
   refresh();

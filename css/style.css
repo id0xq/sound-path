@@ -221,7 +221,9 @@ details.card > summary h3 { font-family: var(--display); font-weight: 400; font-
 .meter { height: 6px; border-radius: 6px; background: rgba(44, 42, 60, 0.07); overflow: hidden; }
 .meter-fill { height: 100%; width: 0; background: linear-gradient(90deg, var(--mint), var(--accent-2) 70%, var(--rec)); transition: width .06s linear; }
 .meter-state { margin: -6px 0 0; color: var(--muted); font-size: 12.5px; }
-.out-field { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
+.out-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; margin-top: 4px; }
+.out-field { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; color: var(--muted); min-width: 0; }
+.out-field select { font-size: 14px; }
 #outState { margin: 0; }
 #outState.warn { color: var(--rec); }
 details.card > summary .rec-time { margin-left: auto; margin-right: 6px; color: var(--muted); font-variant-numeric: tabular-nums; font-size: 14px; }
