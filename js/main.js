@@ -135,6 +135,7 @@ function buildSets() {
     if (!app.conductor.running) app.conductor.load(setId, seed);
   });
   $('#seed').addEventListener('change', () => { if (!app.conductor.running) app.conductor.load(setId, Number($('#seed').value) || 1); });
+  $('#storySpeed').addEventListener('input', (e) => { const v = Number(e.target.value); $('#storySpeedOut').value = Math.round(v * 100) + '%'; app.conductor.speed = v; });
   $('#tempo').addEventListener('input', (e) => { const v = Number(e.target.value); $('#tempoOut').value = Math.round(v * 100) + '%'; app.conductor.setTempoFactor(v); });
 }
 
@@ -584,7 +585,7 @@ function bindLines() {
   $('#cueNext').addEventListener('click', () => {
     const C = app.conductor; if (!C.running || C.held || !C.set) return;
     const i = C.chapterIdx + 1; if (i >= C.set.chapters.length) return;
-    C.seek(i, 8 + Math.random() * 5);
+    C.seek(i, 14 + Math.random() * 4);
   });
   window.addEventListener('keydown', (e) => {
     const tag = (e.target.tagName || '').toLowerCase(); if (tag === 'input' && e.target.type === 'text') return;

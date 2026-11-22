@@ -91,13 +91,13 @@ export class Fauna {
       case 'whales': {
         if (!this.recWhale || Math.random() < 0.06) this.recWhale = { az: rnd(-180, 180) };
         const W = this.recWhale; W.az += rnd(-30, 30);
-        pos = polar(W.az, rnd(-28, -6), rnd(8, 16)); path = (end) => [{ t, pos }, { t: end, pos: polar(W.az + sgn() * rnd(25, 60), rnd(-25, -5), rnd(8, 16)) }];
-        group = 'deep'; send = 0.8; atmos = 0.7; gain = 0.45; kind = 'water'; seq = true; gapAfter = [1.5, 6]; break;
+        pos = polar(W.az, rnd(-28, -6), rnd(13, 22)); path = (end) => [{ t, pos }, { t: end, pos: polar(W.az + sgn() * rnd(25, 60), rnd(-25, -5), rnd(13, 22)) }];
+        group = 'deep'; send = 0.95; atmos = 0.85; gain = 0.27; kind = 'water'; seq = true; gapAfter = [1.5, 6]; break;
       }
       case 'dolphins': {
         const az = rnd(-180, 180), d = rnd(5, 10), dir = sgn();
         pos = polar(az, rnd(-20, 5), d); path = (end) => Array.from({ length: 7 }, (_, i) => ({ t: t + (end - t) * i / 6, pos: polar(az + dir * i * 30, rnd(-20, 5), d) }));
-        send = 0.6; gain = 0.22; kind = 'water'; gapAfter = [2, 9]; break;
+        send = 0.75; gain = 0.1; kind = 'water'; gapAfter = [4, 14]; break;
       }
       case 'owls': pos = polar(rnd(-170, 170), rnd(15, 40), rnd(10, 22)); send = 0.55; gain = 0.35; gapAfter = [10, 26]; break;
       case 'wolves': pos = polar(rnd(-150, 150), rnd(0, 10), rnd(25, 45)); send = 0.9; atmos = 0.5; gain = 0.45; gapAfter = [25, 60]; break;

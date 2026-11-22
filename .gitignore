@@ -3,3 +3,6 @@
 __pycache__/
 .venv/
 samples/nature-library/
+
+# записи сессий проводника — только на компьютере
+tools/record/

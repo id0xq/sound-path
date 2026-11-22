@@ -33,6 +33,7 @@ export class Conductor {
   get duration() { return this.set ? this.set.duration : 0; }
 
   loadSet(set, seed) { return this.load(set, seed); }
+  speed = 1; // скорость сюжета: медленнее или быстрее, звук при этом не меняется
   load(setId, seed) {
     if (this.running) this.stop(true);
     this.rng = new Rng(seed);
@@ -60,6 +61,12 @@ export class Conductor {
     const cur = this.shownLine < 0 ? (dir > 0 ? -1 : 0) : this.shownLine;
     this.viewIdx = Math.max(0, Math.min(this.lines.length - 1, cur + dir));
     if (this.viewIdx === this.lineIdx) this.viewIdx = null;
+    // долистали до следующей главы — атмосфера сама мягко перетекает туда
+    const L = this.viewIdx !== null ? this.lines[this.viewIdx] : null;
+    if (this.running && L && L.ci > this.chapterIdx) {
+      const v = this.viewIdx; this.seek(L.ci, 14 + Math.random() * 4);
+      this.viewIdx = v > this.lineIdx ? v : null;
+    }
     this.emit('line', { idx: this.shownLine, manual: true });
   }
   followLine() { this.viewIdx = null; this.emit('line', { idx: this.lineIdx }); }
@@ -128,12 +135,13 @@ export class Conductor {
   }
 
   applyChapter(idx, fade, immediate = false) {
+    if (!immediate) fade = Math.max(fade, 12); // смены глав всегда плавные
     const E = this.E, A = this.app, ch = this.set.chapters[idx];
     this.chapterIdx = idx;
     const S = (this.state = merge(DEFAULTS, ch));
     const ding = (this.curDing = this.ding + (S.root || 0));
     E.setSpace(S.space, immediate ? 1 : Math.min(fade, 10));
-    E.setSpaceLevel({ scene: S.spaceMix, tau: fade / 3 });
+    E.setSpaceLevel({ scene: S.spaceMix, tau: fade * 0.5 });
     A.field.applyNature(S.nature, S, fade);
 
     const chord = S.chord.map((i) => ding + i);
@@ -141,9 +149,9 @@ export class Conductor {
       if (this.pad) this.pad.dispose(fade);
       this.pad = new Pad(E, 'atmos', S.pad.timbre); this.pad.setChord(chord, 0.05);
     } else this.pad.setChord(chord, fade * 0.6);
-    this.pad.setLevel(S.pad.level, fade / 3);
+    this.pad.setLevel(S.pad.level, fade * 0.5);
 
-    A.tanpura.setRoot(ding); A.tanpura.setLevel(S.tanpura, fade / 3);
+    A.tanpura.setRoot(ding); A.tanpura.setLevel(S.tanpura, fade * 0.5);
     A.binaural.set({ carrier: mtof(ding), beat: S.binaural || 0, scene: S.binaural ? 1 : 0, tau: fade });
     A.breath.setRate(S.breath);
 
@@ -198,7 +206,12 @@ export class Conductor {
     const dt = Math.min(1, Math.max(0, now - (this.lastNow || now))); this.lastNow = now;
     const S = this.state;
     if (this.running && this.set) {
-      if (!this.held) this.elapsed += dt;
+      // отстали от сюжета внутри главы — глава ждёт до 45 с, чтобы переход был готов, когда вы дочитаете
+      const nextCh = this.set.chapters[this.chapterIdx + 1], vl = this.viewIdx !== null ? this.lines[this.viewIdx] : null;
+      const behind = vl && this.viewIdx < this.lineIdx && vl.ci <= this.chapterIdx;
+      const wait = behind && nextCh && this.elapsed + dt * this.speed >= nextCh.at - 0.5 && (this.waitBehind = (this.waitBehind || 0) + dt) < 45;
+      if (!behind) this.waitBehind = 0;
+      if (!this.held && !wait) this.elapsed += dt * this.speed;
       const idx = this.chapterIndexAt(this.elapsed);
       if (idx !== this.chapterIdx) this.applyChapter(idx, this.set.chapters[idx].transition ?? DEFAULTS.transition);
       const li = this.lineIndexAt(this.elapsed);
@@ -206,7 +219,7 @@ export class Conductor {
         const natural = li === this.lineIdx + 1;
         this.lineIdx = li;
         // проводник пролистал вперёд — сюжет догоняет его, но никогда не тянет текст назад
-        if (this.viewIdx !== null && this.viewIdx > li) { /* остаёмся на выбранной реплике */ }
+        if (this.viewIdx !== null && this.viewIdx !== li) { /* проводник читает своё место — ни вперёд, ни назад не дёргаем */ }
         else { this.viewIdx = null; this.emit('line', { idx: li, speak: natural }); }
         const L = this.lines[li];
         if (natural && L && L.ping) A.gen.ping(L.ping, now + 0.05);
@@ -243,7 +256,7 @@ export class Conductor {
 // до обычного — в глубине больше места для ощущений и звуков. Все слова сохраняются, меняется только расстановка.
 function paceSet(set) {
   if (!set || set._paced || !isFinite(set.duration) || /^(path|breath-|scene|myset)/.test(set.id)) return set;
-  const D = set.duration, h = D * 0.5, a = 0.68;
+  const D = set.duration, h = D * 0.5, a = /nidra/.test(set.id) ? 1 : 0.68; // нидру не ускоряем
   const W = (x) => (x <= h ? a * x + (1 - a) * x * x / (2 * h) : (a + (1 - a) / 2) * h + (x - h));
   const chapters = set.chapters.map((ch) => {
     const at = W(ch.at);
@@ -251,7 +264,14 @@ function paceSet(set) {
       script: (ch.script || []).map(([t, ...rest]) => [W(ch.at + t) - at, ...rest]),
       events: (ch.events || []).map((e) => ({ ...e, t: W(ch.at + e.t) - at })) };
   });
-  const out = { ...set, chapters, duration: W(D), _paced: true };
+  // каждой главе — время договорить: после последней реплики не меньше 10 с, иначе следующие главы сдвигаются
+  let shift = 0;
+  chapters.forEach((ch, i) => {
+    ch.at += shift;
+    const last = Math.max(0, ...ch.script.map((l) => l[0])), next = chapters[i + 1];
+    if (next) { const need = ch.at + last + 10 - (next.at + shift); if (need > 0) shift += need; }
+  });
+  const out = { ...set, chapters, duration: W(D) + shift, _paced: true };
   if (set.minutes) out.minutes = Math.round(W(D) / 60);
   return out;
 }

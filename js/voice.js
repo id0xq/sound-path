@@ -12,7 +12,7 @@ export class Voice {
   constructor(E) {
     this.E = E; this.enabled = false; this.stream = null;
     this.settings = {
-      level: 0.9, clarity: 0.5, halo: 0.25, duckDb: 7, gate: true, noiseSuppression: true,
+      level: 0.9, clarity: 0.5, halo: 0.25, duckDb: 10, gate: true, noiseSuppression: true,
       monitor: true, resonance: 0, resonanceDuck: true, warmth: 0.35,
       // «Путь»: всё, что слышит микрофон, превращается в атмосферу (как в Sound Temple)
       mode: 'voice', pathTransform: 0.8, pathAtmos: 0.7, pathDry: 0,
@@ -132,19 +132,19 @@ export class Voice {
     const db = gainToDb(Math.sqrt(sum / this.buf.length));
     this.levelDb = db;
     // шум комнаты: медленно ползёт вверх, быстро опускается — порог речи всегда на 12 дБ выше него
-    this.noiseFloor = db < this.noiseFloor ? this.noiseFloor + (db - this.noiseFloor) * 0.2 : this.noiseFloor + 0.02;
-    this.noiseFloor = Math.max(-80, Math.min(-35, this.noiseFloor));
-    const thr = Math.max(-50, this.noiseFloor + 12);
+    this.noiseFloor = db < this.noiseFloor ? this.noiseFloor + (db - this.noiseFloor) * 0.2 : this.noiseFloor + 0.004;
+    this.noiseFloor = Math.max(-80, Math.min(-46, this.noiseFloor));
+    const thr = Math.max(-54, this.noiseFloor + 9);
     const now = performance.now();
     if (s.mode === 'path') { this.speaking = 0; E.duck(0, s.duckDb, false); this.gateG.gain.setTargetAtTime(1, t, 0.1); return; }
-    if (db > thr) this.holdUntil = now + 380;
+    if (db > thr) this.holdUntil = now + 900;
     const target = now < this.holdUntil ? 1 : 0;
     // быстрая атака, мягкое отпускание
     this.speaking += (target - this.speaking) * (target > this.speaking ? 0.5 : 0.06);
     E.duck(this.speaking, s.duckDb, target > 0.5);
     // гейт: убирает шум между фразами (−14 дБ, не до тишины — звучит естественно)
     // экспандер: между фразами шум уходит на −20 дБ плавно, без «щелчков»
-    if (s.gate) this.gateG.gain.setTargetAtTime(db > thr - 6 || target ? 1 : dbToGain(-20), t, db > thr - 6 ? 0.008 : 0.25);
+    if (s.gate) this.gateG.gain.setTargetAtTime(db > thr - 6 || target ? 1 : dbToGain(-12), t, db > thr - 6 ? 0.008 : 0.45);
     else this.gateG.gain.setTargetAtTime(1, t, 0.05);
     // ореол слышен, когда речь закончилась
     this.haloDuck.gain.setTargetAtTime(1 - this.speaking * 0.94, t, target ? 0.04 : 0.25);

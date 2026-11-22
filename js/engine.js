@@ -109,7 +109,9 @@ export class Engine {
     this.leveler = G(1); this.levelAn = ctx.createAnalyser(); this.levelAn.fftSize = 2048;
     this.musicOut.connect(this.levelAn); this.musicOut.connect(this.leveler);
     this.lvl = { env: 0, gainDb: 0, n: 0 };
-    this.crossfeed.output.connect(this.musicOut);
+    this.guard = ctx.createDynamicsCompressor();
+    this.guard.threshold.value = -24; this.guard.knee.value = 12; this.guard.ratio.value = 6; this.guard.attack.value = 0.015; this.guard.release.value = 0.8;
+    this.crossfeed.output.connect(this.guard); this.guard.connect(this.musicOut);
 
     // --- Голос ---
     this.voiceSum = G(); this.voiceMonitor = G(1); this.voiceRec = G(1);
