@@ -38,6 +38,7 @@ export class Conductor {
     this.rng = new Rng(seed);
     this.seed = seed;
     this.set = typeof setId === 'object' ? setId : setId === 'free' ? makeFreeSet(this.rng) : SETS.find((s) => s.id === setId);
+    this.set = paceSet(this.set);
     this.ding = this.set.base + this.rng.pick(this.set.transpose || [0]);
     this.curDing = this.ding + (this.set.chapters[0].root || 0);
     this.state = merge(DEFAULTS, this.set.chapters[0]);
@@ -236,4 +237,21 @@ export class Conductor {
     A.birds.tick(now, horizon, { ...S, birds: this.D.birds });
     if (this.running) A.gen.tick(now, horizon, S, this.D);
   }
+}
+
+// Темп сюжета: в начале погружение идёт быстрее (слова чаще), к середине время плавно замедляется
+// до обычного — в глубине больше места для ощущений и звуков. Все слова сохраняются, меняется только расстановка.
+function paceSet(set) {
+  if (!set || set._paced || !isFinite(set.duration) || /^(path|breath-|scene|myset)/.test(set.id)) return set;
+  const D = set.duration, h = D * 0.5, a = 0.68;
+  const W = (x) => (x <= h ? a * x + (1 - a) * x * x / (2 * h) : (a + (1 - a) / 2) * h + (x - h));
+  const chapters = set.chapters.map((ch) => {
+    const at = W(ch.at);
+    return { ...ch, at,
+      script: (ch.script || []).map(([t, ...rest]) => [W(ch.at + t) - at, ...rest]),
+      events: (ch.events || []).map((e) => ({ ...e, t: W(ch.at + e.t) - at })) };
+  });
+  const out = { ...set, chapters, duration: W(D), _paced: true };
+  if (set.minutes) out.minutes = Math.round(W(D) / 60);
+  return out;
 }

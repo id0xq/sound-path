@@ -109,7 +109,7 @@ function buildSets() {
   const groups = {};
   for (const st of all) {
     const g = groups[st.group || 'Сеты'] || (groups[st.group || 'Сеты'] = Object.assign(document.createElement('optgroup'), { label: st.group || 'Сеты' }));
-    const o = document.createElement('option'); o.value = st.id; o.textContent = st.title + (st.minutes ? ' · ' + st.minutes + ' мин' : ' · ∞');
+    const o = document.createElement('option'); o.value = st.id; o.textContent = st.title + (st.minutes ? ' · ' + Math.round(st.minutes * 0.92) + ' мин' : ' · ∞');
     g.appendChild(o);
   }
   Object.values(groups).forEach((g) => sel.appendChild(g));
