@@ -125,6 +125,17 @@ export class Engine {
     this.outLimiter = makeLimiter(ctx);
     this.outSum.connect(this.hpVol); this.hpVol.connect(this.outLimiter); this.outLimiter.connect(ctx.destination);
 
+    // --- Монитор проводника: второй выход для проводных наушников ---
+    // Те же атмосфера, сюжет и ведущий, что слышит путешественник, но со своей громкостью,
+    // и голос проводника — отдельной ручкой (если голос слышен на самом рекордере, ставим 0).
+    // Пока монитор выключен, цепочка никуда не подключена и процессор не тратит.
+    this.monSum = G(); this.monGain = G(1); this.monVoice = G(0);
+    this.leveler.connect(this.monSum); this.binauralBus.connect(this.monSum);
+    this.voiceSum.connect(this.monVoice); this.monVoice.connect(this.monSum);
+    this.monLimiter = makeLimiter(ctx);
+    this.monSum.connect(this.monGain); this.monGain.connect(this.monLimiter);
+    this.monDest = null; this.monEl = null; this.monOn = false;
+
     // --- Запись (не зависит от громкости наушников) ---
     this.recSum = G();
     this.leveler.connect(this.recSum); this.voiceRec.connect(this.recSum); this.binauralBus.connect(this.recSum);
@@ -273,6 +284,35 @@ export class Engine {
   }
 
   setHeadphones(v) { this.hpVol.gain.setTargetAtTime(v, this.now, 0.05); }
+
+  // ---------- Два выхода ----------
+  // Основной выход (путешественник): AudioContext.setSinkId — Chrome 110+, Edge, Opera. В Safari и Firefox
+  // его нет: там выход выбирается в системе (Звук → Вывод).
+  get canSetMainSink() { return !!this.ctx && typeof this.ctx.setSinkId === 'function'; }
+  async setMainOutput(id = '') {
+    if (!this.canSetMainSink) throw new Error('Этот браузер не выбирает выход сам. Откройте в Chrome или выберите наушники в системных настройках звука.');
+    await this.ctx.setSinkId(id || '');
+    if (this.ctx.state === 'suspended') { try { await this.ctx.resume(); } catch (e) {} }
+  }
+  // Монитор: копия микса уходит в MediaStream → <audio> с выбранным устройством (HTMLMediaElement.setSinkId).
+  get canSetMonitorSink() { return typeof HTMLMediaElement !== 'undefined' && typeof HTMLMediaElement.prototype.setSinkId === 'function'; }
+  async setMonitorOutput(id = '') {
+    if (!id) { this.stopMonitor(); return; }
+    if (!this.canSetMonitorSink) throw new Error('Этот браузер не умеет выводить звук на второе устройство. Откройте приложение в Chrome.');
+    if (!this.monEl) {
+      this.monDest = this.ctx.createMediaStreamDestination(); this.monDest.channelCount = 2;
+      this.monEl = new Audio(); this.monEl.srcObject = this.monDest.stream; this.monEl.autoplay = true;
+    }
+    await this.monEl.setSinkId(id);
+    if (!this.monOn) { this.monLimiter.connect(this.monDest); this.monOn = true; }
+    await this.monEl.play();
+  }
+  stopMonitor() {
+    if (this.monOn) { try { this.monLimiter.disconnect(this.monDest); } catch (e) {} this.monOn = false; }
+    if (this.monEl) this.monEl.pause();
+  }
+  setMonitorLevel(v) { this.monGain.gain.setTargetAtTime(v, this.now, 0.05); }
+  setMonitorVoice(v) { this.monVoice.gain.setTargetAtTime(v, this.now, 0.05); }
 
   level() {
     const a = this._meterBuf || (this._meterBuf = new Float32Array(this.meter.fftSize));

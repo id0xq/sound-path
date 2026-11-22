@@ -1,5 +1,6 @@
 // Интерфейс: связывает кнопки, купол, ханг и панели с аудиодвижком.
 import { App } from './app.js';
+import { paceSet } from './conductor.js';
 import { SETS } from './sets.js';
 import { BRAINWAVES } from './live.js';
 import { motionAvailable } from './headtrack.js';
@@ -51,7 +52,7 @@ $('#enter').addEventListener('click', async () => {
 function boot() {
   const C = app.conductor, E = app.E;
   sphere = new Sphere($('#dome'), app);
-  buildSpaces(); buildSets(); buildPads(); buildHang(); bindHang(); buildMixer(); bindVoice(); bindRecorder(); bindSettings(); bindPlacement(); bindKeys();
+  buildSpaces(); buildSets(); buildPads(); buildHang(); bindHang(); buildMixer(); bindVoice(); bindOutputs(); bindRecorder(); bindSettings(); bindPlacement(); bindKeys();
   app.breathwork = new Breathwork(app);
   bindLines(); bindNarrator(); bindHead(); bindViz(); bindTabs(); bindBreath(); bindBuilder(); bindMedia(); bindWaves(); bindPath(); bindNow();
 
@@ -109,7 +110,7 @@ function buildSets() {
   const groups = {};
   for (const st of all) {
     const g = groups[st.group || 'Сеты'] || (groups[st.group || 'Сеты'] = Object.assign(document.createElement('optgroup'), { label: st.group || 'Сеты' }));
-    const o = document.createElement('option'); o.value = st.id; o.textContent = st.title + (st.minutes ? ' · ' + Math.round(st.minutes * 0.92) + ' мин' : ' · ∞');
+    const o = document.createElement('option'); o.value = st.id; o.textContent = st.title + (st.minutes ? ' · ' + (isFinite(st.duration) ? Math.round(paceSet(st).duration / 60) : st.minutes) + ' мин' : ' · ∞');
     g.appendChild(o);
   }
   Object.values(groups).forEach((g) => sel.appendChild(g));
@@ -487,11 +488,81 @@ function bindVoice() {
       const devs = await V.devices(), sel = $('#micSelect'), cur = sel.value;
       sel.innerHTML = '<option value="">Микрофон</option>' + devs.map((d) => `<option value="${d.deviceId}">${escapeHtml(d.label || 'Микрофон')}</option>`).join('');
       sel.value = cur;
+      app.refreshOutputs && app.refreshOutputs();   // после доступа к микрофону браузер показывает названия устройств вывода
     } catch (e) {
       $('#micState').textContent = e.name === 'NotAllowedError' ? 'Доступ запрещён. Разрешите микрофон в настройках браузера для этой страницы.' : 'Микрофон не включился: ' + e.message;
     }
   });
   $('#micSelect').addEventListener('change', async () => { if (V.enabled) { await V.enable($('#micSelect').value || undefined); } });
+}
+
+// ---------- Два слушателя: наушники путешественника и монитор проводника ----------
+// Путешественник слышит основной выход, проводник — копию микса на втором устройстве (проводные наушники,
+// рекордер по USB или разъём Mac). Названия устройств браузер показывает только после доступа к микрофону.
+function bindOutputs() {
+  const E = app.E, saved = store.get('out', {});
+  const selMain = $('#outMain'), selMon = $('#outMon'), state = $('#outState'), vol = $('#monVol'), vc = $('#monVoice');
+  const NO_NAMES = 'Названия устройств появятся после включения микрофона: до разрешения браузер их скрывает.';
+  let outs = [];
+  const applied = { main: '', mon: '' };
+  const persist = () => store.set('out', saved);
+  const say = (msg, warn = false) => { state.textContent = msg; state.classList.toggle('warn', warn); };
+  const nameOf = (id) => { const d = outs.find((x) => x.deviceId === id); return d && d.label ? d.label : 'выбранное устройство'; };
+  const sameDevice = (a, b) => {
+    const A = outs.find((d) => d.deviceId === (a || 'default')), B = outs.find((d) => d.deviceId === (b || 'default'));
+    return !!(A && B && (A.deviceId === B.deviceId || (A.groupId && A.groupId === B.groupId)));
+  };
+  function fill(sel, first, keep) {
+    const real = outs.filter((d) => d.deviceId && d.deviceId !== 'default' && d.deviceId !== 'communications');
+    sel.innerHTML = `<option value="">${first}</option>` + real.map((d, i) => `<option value="${escapeHtml(d.deviceId)}">${escapeHtml(d.label || 'Выход ' + (i + 1))}</option>`).join('');
+    sel.value = real.some((d) => d.deviceId === keep) ? keep : '';
+  }
+  function report() {
+    if (!E.canSetMainSink && !E.canSetMonitorSink) return say('Этот браузер не умеет выбирать устройство вывода. Откройте приложение в Chrome.', true);
+    if (!outs.some((d) => d.label)) return say(NO_NAMES);
+    if (!selMon.value) return say('Монитор выключен.');
+    if (sameDevice(selMain.value, selMon.value)) return say('Монитор и путешественник на одном устройстве: звук удвоится. Выберите разные наушники.', true);
+    say(`Путешественник: ${selMain.value ? nameOf(selMain.value) : 'системный выход'}. Монитор: ${nameOf(selMon.value)}.`);
+  }
+  // save=true — выбор сделал человек (запоминаем); save=false — автоматическое восстановление после обновления списка
+  async function applyMain(save) {
+    const id = selMain.value;
+    try {
+      if (id || applied.main) await E.setMainOutput(id);
+      applied.main = id; if (save) { saved.main = id; persist(); }
+    } catch (e) { selMain.value = applied.main; say('Не удалось переключить наушники путешественника: ' + (e.message || e.name), true); return false; }
+    return true;
+  }
+  async function applyMon(save) {
+    const id = selMon.value;
+    try {
+      await E.setMonitorOutput(id);
+      applied.mon = id; if (save) { saved.mon = id; persist(); }
+    } catch (e) { selMon.value = applied.mon; say('Монитор не включился: ' + (e.message || e.name), true); return false; }
+    return true;
+  }
+  async function refresh() {
+    try { outs = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'audiooutput'); } catch (e) { outs = []; }
+    // сохранённый выбор возвращаем, как только устройство появилось в списке (например, включили Bluetooth)
+    fill(selMain, 'Как выбрано в системе', selMain.value || saved.main || '');
+    fill(selMon, 'Выключен', selMon.value || saved.mon || '');
+    let ok = true;
+    if (selMain.value !== applied.main) ok = (await applyMain(false)) && ok;
+    if (selMon.value !== applied.mon) ok = (await applyMon(false)) && ok;
+    if (ok) report();
+  }
+  selMain.disabled = !E.canSetMainSink; selMon.disabled = !E.canSetMonitorSink;
+  vol.value = saved.vol ?? 1; vc.value = saved.voice ?? 0;
+  E.setMonitorLevel(Number(vol.value)); E.setMonitorVoice(Number(vc.value));
+  vol.addEventListener('input', () => { E.setMonitorLevel(Number(vol.value)); saved.vol = Number(vol.value); persist(); });
+  vc.addEventListener('input', () => { E.setMonitorVoice(Number(vc.value)); saved.voice = Number(vc.value); persist(); });
+  selMain.addEventListener('change', async () => { if (await applyMain(true)) report(); });
+  selMon.addEventListener('change', async () => { if (await applyMon(true)) report(); });
+  $('#outRefresh').addEventListener('click', refresh);
+  $('#outCard').addEventListener('toggle', () => { if ($('#outCard').open) refresh(); });
+  if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) navigator.mediaDevices.addEventListener('devicechange', refresh);
+  app.refreshOutputs = refresh;
+  refresh();
 }
 
 // ---------- Запись ----------

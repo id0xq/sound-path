@@ -221,6 +221,9 @@ details.card > summary h3 { font-family: var(--display); font-weight: 400; font-
 .meter { height: 6px; border-radius: 6px; background: rgba(44, 42, 60, 0.07); overflow: hidden; }
 .meter-fill { height: 100%; width: 0; background: linear-gradient(90deg, var(--mint), var(--accent-2) 70%, var(--rec)); transition: width .06s linear; }
 .meter-state { margin: -6px 0 0; color: var(--muted); font-size: 12.5px; }
+.out-field { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
+#outState { margin: 0; }
+#outState.warn { color: var(--rec); }
 details.card > summary .rec-time { margin-left: auto; margin-right: 6px; color: var(--muted); font-variant-numeric: tabular-nums; font-size: 14px; }
 .rec-btn { display: flex; align-items: center; justify-content: center; gap: 12px; min-height: 50px; border: 1px solid var(--line-2); background: var(--card-2); color: var(--ink); border-radius: 16px; cursor: pointer; font-size: 15px; font-weight: 500; }
 .rec-btn .dot { width: 13px; height: 13px; border-radius: 50%; background: var(--rec); box-shadow: 0 0 0 4px rgba(232, 119, 111, 0.15); }

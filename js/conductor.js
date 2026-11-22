@@ -254,7 +254,7 @@ export class Conductor {
 
 // Темп сюжета: в начале погружение идёт быстрее (слова чаще), к середине время плавно замедляется
 // до обычного — в глубине больше места для ощущений и звуков. Все слова сохраняются, меняется только расстановка.
-function paceSet(set) {
+export function paceSet(set) {
   if (!set || set._paced || !isFinite(set.duration) || /^(path|breath-|scene|myset)/.test(set.id)) return set;
   const D = set.duration, h = D * 0.5, a = /nidra/.test(set.id) ? 1 : 0.68; // нидру не ускоряем
   const W = (x) => (x <= h ? a * x + (1 - a) * x * x / (2 * h) : (a + (1 - a) / 2) * h + (x - h));

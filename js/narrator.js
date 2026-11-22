@@ -32,7 +32,7 @@ export class Narrator {
     this.out = ctx.createGain(); this.out.channelCount = 2; this.out.channelCountMode = 'explicit'; this.out.channelInterpretation = 'speakers';
     this.out.gain.value = 1.15;
     this.inGain.connect(hp); hp.connect(warm); warm.connect(pres); pres.connect(comp); comp.connect(this.out);
-    this.out.connect(this.E.outSum); this.out.connect(this.E.recSum);
+    this.out.connect(this.E.outSum); this.out.connect(this.E.recSum); this.out.connect(this.E.monSum);
     this.out.connect(app.voice.haloSend);          // ореол в паузах — как у живого голоса
     this.an = ctx.createAnalyser(); this.an.fftSize = 1024; this.out.connect(this.an); this.buf = new Float32Array(1024);
     this.level = 0;
