@@ -37,7 +37,7 @@ export class Sphere {
   setMode(m) { this.mode = m; this.ctx.clearRect(0, 0, this.w, this.h); this.img = null; }
   resize() {
     const r = this.cv.getBoundingClientRect(), dpr = Math.min(1.5, window.devicePixelRatio || 1);
-    this.dpr = dpr; this.w = r.width; this.h = r.height; this.cv.width = Math.round(r.width * dpr); this.cv.height = Math.round(r.height * dpr);
+    this.w = r.width; this.h = r.height; this.cv.width = Math.round(r.width * dpr); this.cv.height = Math.round(r.height * dpr);
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     this.R = Math.min(this.w, this.h) * 0.4; this.cx = this.w / 2; this.cy = this.h / 2;
   }
@@ -83,84 +83,7 @@ export class Sphere {
     if (this.mode === 'lissajous') return this.drawLissajous();
     if (this.mode === 'chladni') return this.drawChladni();
     if (this.mode === 'breath') return this.drawBreath();
-    if (this.mode === 'land') return this.drawLand();
     this.drawDome();
-  }
-
-  // ---------- Живой пейзаж: сцена сюжета, звуки живут на своих местах ----------
-  // Слева–справа — направление звука, высота на картинке — где он живёт: птицы в кронах, вода внизу, колокола в храме.
-  landTheme() {
-    const id = (this.app.conductor && this.app.conductor.set && this.app.conductor.set.id) || '';
-    const T = {
-      forest: { sky: ['#f6efe4', '#e7eef0'], sun: '#ffe2b8', hills: ['#c9d8cf', '#a9c4b6', '#86ab98'], trees: '#6f957f', water: '#a9cfd8', night: false },
-      ocean: { sky: ['#eaf2f6', '#d3e6ee'], sun: '#fff1d6', hills: ['#bcd6e0', '#9cc3d3'], trees: null, water: '#7fb2c8', sea: true, night: false },
-      night: { sky: ['#2f2d4a', '#4a4670'], sun: '#f3eedc', hills: ['#3e3b5e', '#35324f', '#2b2942'], trees: '#25233a', water: '#3d4d6e', night: true },
-      temple: { sky: ['#f7ece4', '#efe3ef'], sun: '#ffd9b0', hills: ['#dccfe0', '#c4b6d0', '#ab9cbd'], trees: '#9686ad', water: '#b8c8e0', temple: true, night: false },
-      mountain: { sky: ['#eef0f6', '#dfe5f0'], sun: '#fff0d8', hills: ['#cfd5e4', '#aeb8cf', '#8f9bb6'], trees: '#7d8aa8', water: '#b6cde0', peaks: true, night: false },
-    };
-    const k = /whale|ocean|wave/.test(id) ? 'ocean' : /night|nidra|sleep/.test(id) ? 'night' : /temple|bowl|love|gong/.test(id) ? 'temple' : /mount|summit|breath/.test(id) ? 'mountain' : 'forest';
-    return T[k];
-  }
-  drawLand() {
-    const c = this.ctx, A = this.app, E = A.E, now = E.now, dpr = this.dpr || 1;
-    const W = this.w * dpr, H = this.h * dpr, th = this.landTheme(), t = performance.now() / 1000;
-    c.save(); c.setTransform(1, 0, 0, 1, 0, 0);
-    const sky = c.createLinearGradient(0, 0, 0, H); sky.addColorStop(0, th.sky[0]); sky.addColorStop(1, th.sky[1]);
-    c.fillStyle = sky; c.fillRect(0, 0, W, H);
-    // солнце или луна дышит в такт
-    const br = A.breath ? A.breath.state(now) : null, bk = br ? br.k : 0.5 + 0.5 * Math.sin(t * 0.35);
-    const sx = W * 0.72, sy = H * 0.24, sr = Math.min(W, H) * (0.07 + 0.012 * bk);
-    const sg = c.createRadialGradient(sx, sy, 0, sx, sy, sr * 3.2); sg.addColorStop(0, th.sun); sg.addColorStop(0.32, th.sun + 'aa'); sg.addColorStop(1, th.sun + '00');
-    c.fillStyle = sg; c.fillRect(0, 0, W, H);
-    if (th.night) { c.fillStyle = 'rgba(255,255,240,0.8)'; for (let i = 0; i < 60; i++) { const x = (i * 97.3 % 1) * W || ((i * 0.6180339) % 1) * W, y = ((i * 0.37) % 0.55) * H; const tw = 0.5 + 0.5 * Math.sin(t * 1.3 + i); c.globalAlpha = 0.25 + 0.5 * tw; c.fillRect(((i * 0.6180339) % 1) * W, y, 1.6 * dpr, 1.6 * dpr); } c.globalAlpha = 1; }
-    // слои холмов (или гор) с медленным параллаксом
-    const layers = th.hills.length;
-    th.hills.forEach((col, li) => {
-      const base = H * (0.5 + li * 0.11), amp = H * (th.peaks ? 0.16 - li * 0.03 : 0.05 + li * 0.015), drift = t * (0.006 + li * 0.004);
-      c.fillStyle = col; c.beginPath(); c.moveTo(0, H);
-      for (let x = 0; x <= W; x += 6 * dpr) {
-        const u = x / W;
-        const y = th.peaks ? base - amp * Math.abs(Math.sin(u * (3 + li) * Math.PI + li + drift)) * (0.6 + 0.4 * Math.sin(u * 7 + li))
-          : base - amp * (Math.sin(u * (2.2 + li) * Math.PI + li * 1.7 + drift) * 0.6 + Math.sin(u * 9 + li + drift * 2) * 0.25);
-        c.lineTo(x, y);
-      }
-      c.lineTo(W, H); c.closePath(); c.fill();
-      // деревья на среднем слое мягко качаются
-      if (th.trees && li === layers - 2) {
-        c.fillStyle = th.trees;
-        for (let i = 0; i < 26; i++) {
-          const u = ((i * 0.6180339) % 1), x = u * W, y = base - amp * (Math.sin(u * (2.2 + li) * Math.PI + li * 1.7 + drift) * 0.6 + Math.sin(u * 9 + li + drift * 2) * 0.25);
-          const h = H * (0.06 + 0.05 * ((i * 0.37) % 1)), sw = Math.sin(t * 0.6 + i) * h * 0.04;
-          c.beginPath(); c.moveTo(x - h * 0.22, y + 2); c.quadraticCurveTo(x + sw, y - h * 1.1, x + h * 0.22, y + 2); c.fill();
-        }
-      }
-    });
-    // храм: силуэт ступы на холме
-    if (th.temple) {
-      const x = W * 0.3, y = H * 0.56, s = Math.min(W, H) * 0.09; c.fillStyle = th.trees;
-      c.beginPath(); c.ellipse(x, y - s * 0.55, s * 0.55, s * 0.5, 0, Math.PI, 0); c.fill(); c.fillRect(x - s * 0.7, y - s * 0.55, s * 1.4, s * 0.55);
-      c.fillRect(x - s * 0.08, y - s * 1.5, s * 0.16, s * 0.5); c.beginPath(); c.arc(x, y - s * 1.55, s * 0.12, 0, Math.PI * 2); c.fill();
-    }
-    // вода внизу: мерцающая гладь
-    const wy = H * (th.sea ? 0.62 : 0.86);
-    const wg = c.createLinearGradient(0, wy, 0, H); wg.addColorStop(0, th.water + 'cc'); wg.addColorStop(1, th.water);
-    c.fillStyle = wg; c.fillRect(0, wy, W, H - wy);
-    c.strokeStyle = 'rgba(255,255,255,0.45)'; c.lineWidth = 1.2 * dpr;
-    for (let i = 0; i < 14; i++) { const y = wy + (H - wy) * ((i + 0.5) / 14), x = ((i * 0.6180339 + t * 0.01 * (1 + i % 3)) % 1) * W, w = W * (0.04 + 0.05 * ((i * 0.37) % 1)); c.globalAlpha = 0.3 + 0.3 * Math.sin(t + i); c.beginPath(); c.moveTo(x, y); c.lineTo(x + w, y); c.stroke(); }
-    c.globalAlpha = 1;
-    // звуки на своих местах: направление → по горизонтали, природа звука → по высоте
-    const zone = { bird: [0.2, 0.42], crickets: [0.6, 0.78], water: [0.88, 0.97], heart: [0.5, 0.6], fire: [0.7, 0.82], bells: [0.3, 0.5], gong: [0.45, 0.6], bowl: [0.55, 0.7], wash: [0.15, 0.35] };
-    for (const v of E.viz.values()) {
-      const act = v.activity ? v.activity(now) : 1; if (act < 0.02) continue;
-      const pos = v.posAt(now); if (!pos) continue;
-      const { az, el } = toPolar(pos), z = zone[v.kind] || [0.4, 0.75];
-      const x = W * (0.5 + clamp(az, -180, 180) / 360 * 0.92), y = H * (z[1] - (z[1] - z[0]) * clamp((el + 20) / 80, 0, 1));
-      const col = KIND_COLORS[v.kind] || '#ffffff', r = (10 + 26 * Math.min(1, act)) * dpr;
-      c.globalCompositeOperation = th.night ? 'lighter' : 'source-over'; c.globalAlpha = Math.min(1, 0.35 + act * 0.8);
-      c.drawImage(this.sprite(col), x - r, y - r, r * 2, r * 2);
-    }
-    c.globalAlpha = 1; c.globalCompositeOperation = 'source-over';
-    c.restore();
   }
 
   // ---------- Купол ----------
