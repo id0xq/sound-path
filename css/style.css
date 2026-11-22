@@ -431,3 +431,9 @@ details.card > summary .rec-time { margin-left: auto; margin-right: 6px; color: 
   .side { display: flex; flex-direction: column; align-self: stretch; }
   .side > .card:last-child { flex: 1; }
 }
+
+/* компьютер: блоки всегда открыты, стрелок сворачивания нет */
+@media (min-width: 1025px) {
+  details.card > summary, .chapters-wrap > summary { cursor: default; pointer-events: none; }
+  details.card > summary::after, .chapters-wrap > summary::after { display: none; }
+}

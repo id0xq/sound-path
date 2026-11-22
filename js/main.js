@@ -689,6 +689,11 @@ function bindTabs() {
   }));
   // на телефоне блоки свёрнуты — открываются по касанию
   if (window.matchMedia('(max-width: 820px)').matches) ['#voiceCard', '#recCard', '#soundsCard', '#chaptersWrap'].forEach((id) => { $(id).open = false; });
+  // на компьютере всё разложено под экран: блоки не сворачиваются (только на телефоне и планшете)
+  const desk = window.matchMedia('(min-width: 1025px)');
+  const keepOpen = () => { if (desk.matches) $$('details.card, details.chapters-wrap').forEach((d) => { d.open = true; }); };
+  $$('details.card, details.chapters-wrap').forEach((d) => d.addEventListener('toggle', () => { if (desk.matches && !d.open) d.open = true; }));
+  desk.addEventListener('change', keepOpen); keepOpen();
 }
 let cueBorrowed = false;
 function showTab(tab) {
